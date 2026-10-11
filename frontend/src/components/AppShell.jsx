@@ -103,8 +103,11 @@ export default function AppShell({ children, activePage = 'home', onNavigate }) 
         </aside>
 
         {/* Content Area */}
-        <main className="flex-1 pb-24 md:pb-8 px-4 sm:px-6 py-6 overflow-x-hidden min-w-0">
-          {children}
+        <main className="flex-1 pb-24 md:pb-8 px-4 sm:px-6 py-6 overflow-x-hidden min-w-0 flex flex-col justify-between">
+          <div>{children}</div>
+          <footer className="text-center text-[11px] text-gray-400 dark:text-gray-500 font-medium pt-8 pb-2 select-none">
+            Created by Arya Mandavgane for AIMPACT
+          </footer>
         </main>
       </div>
 

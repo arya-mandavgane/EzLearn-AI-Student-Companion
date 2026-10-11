@@ -14,6 +14,7 @@ Last updated: 2026-10-11 — Brand Updated to EzLearn (ℰℓ Logo), Navbar Clea
   - Empty Chat state: Welcome screen centered `ℰℓ` badge with "Welcome to EzLearn".
   - Shell header: `frontend/src/components/AppShell.jsx` updated with `ℰℓ` badge.
   - Google Fonts: Preconnected and loaded `Dancing Script` and `Great Vibes` in `frontend/index.html`.
+  - Credits footer: Added "Created by Arya Mandavgane for AIMPACT" at the bottom of the page across all views.
 - **Top-Right Simulation Shortcuts Removal**:
   - Removed top navbar `Simulations Quick Launcher` buttons (`📚 Stack`, `🎟️ Queue`, `📊 Sorting`) and modal container from `frontend/src/App.jsx`.
   - Simulations remain exclusively contextual and inline inside chat turns under Step 3 (`ProcessSimulationView`).

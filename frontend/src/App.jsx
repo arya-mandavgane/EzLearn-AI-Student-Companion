@@ -576,6 +576,11 @@ export default function App() {
               ⚠️ Strict Study Resource Rule: Click <strong>+</strong> to add study notes before typing.
             </p>
           )}
+
+          {/* ── Footer Credits ── */}
+          <footer className="text-center text-[11px] text-gray-400 dark:text-gray-500 font-medium pt-2 pb-0.5 select-none">
+            Created by Arya Mandavgane for AIMPACT
+          </footer>
         </div>
 
       </main>

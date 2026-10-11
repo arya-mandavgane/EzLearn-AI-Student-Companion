@@ -47,11 +47,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, apiUrl = 'ht
       : { email: email.trim(), password }
 
     try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 75000)
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       })
+      clearTimeout(timer)
       const data = await res.json()
 
       if (!res.ok) {
@@ -62,8 +67,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, apiUrl = 'ht
         onAuthSuccess(data.user, data.access_token)
         onClose()
       }
-    } catch {
-      setError('Unable to reach server. Please make sure the backend is running on port 8000.')
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setError('Server took too long to respond. The free backend server on Render might still be waking up — please try again in 10 seconds.')
+      } else {
+        setError(`Unable to reach server (${apiUrl}). Please make sure your backend is running or has finished waking up.`)
+      }
     } finally {
       setLoading(false)
     }
@@ -199,10 +208,17 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, apiUrl = 'ht
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm shadow-md transition-all disabled:opacity-60"
+            className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm shadow-md transition-all disabled:opacity-60 flex items-center justify-center gap-2"
           >
-            {loading ? 'Please wait…' : (mode === 'login' ? 'Log In' : 'Create Account')}
+            {loading && <span className="animate-spin text-sm">⏳</span>}
+            {loading ? 'Connecting to backend…' : (mode === 'login' ? 'Log In' : 'Create Account')}
           </button>
+
+          {loading && (
+            <p className="text-[11px] text-amber-600 text-center animate-pulse pt-1">
+              ⏳ If the free backend is waking up, this can take up to 45–60 seconds on the first request.
+            </p>
+          )}
         </form>
 
         {/* ── Social / Alternative Options ── */}

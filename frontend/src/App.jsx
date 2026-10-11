@@ -28,10 +28,21 @@ import { ProcessSimulationView } from './components/SimulationView'
 import { TenQuestionQuiz } from './components/TenQuestionQuiz'
 import AuthModal from './components/AuthModal'
 
-const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const API_URL = rawApiUrl.trim().replace(/\/+$/, '').replace(/\/api$/, '')
+export function getApiBaseUrl() {
+  if (typeof window !== 'undefined') {
+    const override = localStorage.getItem('ezlearn_api_url')
+    if (override && override.trim()) {
+      return override.trim().replace(/\/+$/, '').replace(/\/api$/, '')
+    }
+  }
+  const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  return rawApiUrl.trim().replace(/\/+$/, '').replace(/\/api$/, '')
+}
 
 export default function App() {
+  const [apiUrl, setApiUrl] = useState(getApiBaseUrl)
+  const API_URL = apiUrl
+
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('asc_theme') === 'dark' || false
   })
@@ -582,6 +593,7 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         onAuthSuccess={(user) => setCurrentUser(user)}
         apiUrl={API_URL}
+        onUpdateApiUrl={(newUrl) => setApiUrl(newUrl)}
       />
 
     </div>

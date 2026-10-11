@@ -3,7 +3,8 @@ import mockExplain from '../mocks/explain.json'
 import mockQuiz from '../mocks/quiz.json'
 import mockSimulations from '../mocks/simulations_catalog.json'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const rawBase = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE_URL = rawBase.trim().replace(/\/+$/, '')
 const PRIMARY_BASE_URL = BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`
 const FALLBACK_BASE_URL = BASE_URL.endsWith('/api') ? BASE_URL.replace(/\/api$/, '') : BASE_URL
 

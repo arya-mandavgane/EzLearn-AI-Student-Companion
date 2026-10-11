@@ -16,13 +16,17 @@ class Settings(BaseSettings):
     max_audio_seconds: int = 60
     max_text_chars: int = 50_000
     max_explain_chars: int = 8_000
-    cors_origins: List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    cors_origins: List[str] = ["*"]
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @classmethod
+    def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings):
+        return (init_settings, env_settings, dotenv_settings, file_secret_settings)
 
 
 settings = Settings()

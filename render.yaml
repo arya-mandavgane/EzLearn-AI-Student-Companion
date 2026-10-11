@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: ezlearn-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: AI_PROVIDER
+        value: gemini
+      - key: AI_MOCK
+        value: false
+      - key: DATABASE_URL
+        value: sqlite:///./study_companion.db
+      - key: CORS_ORIGINS
+        value: "*"

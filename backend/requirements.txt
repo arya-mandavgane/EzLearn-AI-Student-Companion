@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+google-genai
+PyMuPDF
+opencv-python-headless
+numpy
+python-multipart
+pydantic-settings
+sqlalchemy
+bcrypt
+pyjwt

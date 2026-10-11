@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  /* Design tokens as CSS custom properties */
+  :root {
+    --color-primary: #6366f1;    /* indigo-500 */
+    --color-primary-dark: #4f46e5; /* indigo-600 */
+    --color-accent: #f59e0b;     /* amber-500 */
+    --color-success: #10b981;    /* emerald-500 */
+    --color-danger: #ef4444;     /* red-500 */
+    --color-warning: #f59e0b;    /* amber-500 */
+    --radius-card: 1rem;
+    --radius-btn: 0.75rem;
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "nav": {
+    "home": "Home",
+    "learn": "Learn",
+    "quiz": "Quiz",
+    "progress": "Progress"
+  },
+  "home": {
+    "headline": "Study smarter, not harder",
+    "subline": "Paste your notes, upload a file, or speak — and get a clear explanation in your language.",
+    "try_demo": "Try with example notes",
+    "add_material": "Add your material"
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "next": "Next",
+    "done": "Got it!",
+    "screen1_title": "Turn any notes into simple explanations",
+    "screen1_body": "Paste text, upload a PDF or photo, or record your voice. We'll convert it all to text for you.",
+    "screen2_title": "Test yourself with instant quizzes",
+    "screen2_body": "After reading the explanation, take a quick quiz. We'll track which topics you need to review.",
+    "screen3_title": "Practice with interactive simulations",
+    "screen3_body": "See data structures like Stack and Queue come to life with step-by-step animations."
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong.",
+    "retry": "Try again",
+    "offline": "You are offline. Simulations and saved content still work.",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "back": "Back"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "hi": "हिंदी",
+    "mr": "मराठी"
+  }
+}

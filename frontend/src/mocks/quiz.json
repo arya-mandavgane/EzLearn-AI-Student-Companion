@@ -1,0 +1,70 @@
+{
+  "quiz_id": "mock-quiz-001",
+  "topic": "Stack Data Structure",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "mcq",
+      "topic": "LIFO Principle",
+      "question": "What does LIFO stand for in data structures?",
+      "options": [
+        "Last-In, First-Out",
+        "Last-In, Fast-Order",
+        "Linear-Input, First-Output",
+        "Least-Indexed, First-Operation"
+      ],
+      "correct_answer": "Last-In, First-Out",
+      "explanation": "LIFO means the most recently added element is the first one to be removed."
+    },
+    {
+      "id": "q2",
+      "type": "mcq",
+      "topic": "Push Operation",
+      "question": "Which operation adds an element to the top of a stack?",
+      "options": [
+        "Pop",
+        "Push",
+        "Peek",
+        "Enqueue"
+      ],
+      "correct_answer": "Push",
+      "explanation": "Push inserts an element onto the top of the stack."
+    },
+    {
+      "id": "q3",
+      "type": "mcq",
+      "topic": "Pop Operation",
+      "question": "What happens when you perform a Pop operation on an empty stack?",
+      "options": [
+        "Stack Overflow",
+        "Stack Underflow",
+        "Memory Leak",
+        "Segmentation Fault"
+      ],
+      "correct_answer": "Stack Underflow",
+      "explanation": "Attempting to remove an element from an empty stack causes a Stack Underflow error."
+    },
+    {
+      "id": "q4",
+      "type": "short",
+      "topic": "Real-world analogy",
+      "question": "Give a common real-world analogy for a stack data structure.",
+      "correct_answer": "A pile of plates or a stack of books",
+      "explanation": "A pile of plates is a classic example: you add new plates to the top and remove plates from the top."
+    },
+    {
+      "id": "q5",
+      "type": "mcq",
+      "topic": "Peek Operation",
+      "question": "Which operation inspects the top item of the stack without removing it?",
+      "options": [
+        "Pop",
+        "Peek (or Top)",
+        "Search",
+        "Traverse"
+      ],
+      "correct_answer": "Peek (or Top)",
+      "explanation": "Peek allows inspecting the element at the top of the stack without modifying the stack."
+    }
+  ]
+}

@@ -1,0 +1,588 @@
+/**
+ * App.jsx — AI Study Companion (Chatbot Experience)
+ * ────────────────────────────────────────────────
+ * Gemini Webapp Style Interface:
+ * - Left Sidebar with 5 Tiers:
+ *   1) Daily report
+ *   2) Weekly report
+ *   3) Monthly report
+ *   4) Start new conversation
+ *   5) History (List)
+ * - Top-right: Dark / Light mode toggle & Auth status
+ * - Main chat window:
+ *   - Input area with '+' button on leftmost side, text input, and submit on rightmost side
+ *   - Resource enforcement: User cannot chat until resources (text, image, audio, files) are attached
+ *   - Dynamic resources panel for active chat
+ *   - Message turns rendering:
+ *     1. What you asked
+ *     2. Explanation (everyday analogy, key terms, summary)
+ *     3. Demonstration / simulation
+ *     4. 10-Question Quiz (single attempt lock)
+ *     5. AI suggestions regarding strengths, weaknesses, must-do topics
+ */
+
+import React, { useState, useEffect, useRef } from 'react'
+import { Sidebar } from './components/Sidebar'
+import { ResourceModal } from './components/ResourceModal'
+import { ProcessSimulationView } from './components/SimulationView'
+import { TenQuestionQuiz } from './components/TenQuestionQuiz'
+import AuthModal from './components/AuthModal'
+
+const API_URL = 'http://localhost:8000'
+
+export default function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('asc_theme') === 'dark' || false
+  })
+
+  // Auth state
+  const [isAuthOpen, setIsAuthOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('asc_user')
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  })
+
+  // Conversation state
+  const [conversations, setConversations] = useState([])
+  const [activeConvId, setActiveConvId] = useState(null)
+  const [currentConvData, setCurrentConvData] = useState(null) // { id, title, resources, messages }
+  const [loadingConv, setLoadingConv] = useState(false)
+
+  // Chat input state
+  const [promptInput, setPromptInput] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [errorNotice, setErrorNotice] = useState('')
+  const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
+
+  const messagesEndRef = useRef(null)
+
+  // Apply dark mode class to root
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('asc_theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('asc_theme', 'light')
+    }
+  }, [darkMode])
+
+  // Initial load: Fetch conversations if user is signed in, or start volatile guest chat
+  useEffect(() => {
+    if (currentUser) {
+      fetchConversations()
+    } else {
+      setConversations([])
+      startNewConversation()
+    }
+  }, [currentUser])
+
+  function getAuthHeaders(extraHeaders = {}) {
+    const token = localStorage.getItem('asc_token')
+    const headers = { ...extraHeaders }
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    return headers
+  }
+
+  async function fetchConversations() {
+    if (!currentUser) {
+      setConversations([])
+      return
+    }
+    try {
+      const res = await fetch(`${API_URL}/api/chat/conversations`, {
+        headers: getAuthHeaders(),
+      })
+      const list = await res.json()
+      setConversations(list || [])
+      if (list && list.length > 0 && !activeConvId) {
+        loadConversation(list[0].id)
+      } else if (!list || list.length === 0) {
+        startNewConversation()
+      }
+    } catch {
+      console.warn('Could not load chat history from server.')
+    }
+  }
+
+  async function loadConversation(id) {
+    if (!id) return
+    setActiveConvId(id)
+    setLoadingConv(true)
+    setErrorNotice('')
+    try {
+      const res = await fetch(`${API_URL}/api/chat/conversations/${id}`, {
+        headers: getAuthHeaders(),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setErrorNotice(data.detail || 'Could not load conversation details.')
+      } else {
+        setCurrentConvData(data)
+      }
+    } catch {
+      setErrorNotice('Could not load conversation details.')
+    } finally {
+      setLoadingConv(false)
+    }
+  }
+
+  async function startNewConversation() {
+    try {
+      const res = await fetch(`${API_URL}/api/chat/conversations`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ title: 'New Study Session' }),
+      })
+      const data = await res.json()
+      if (currentUser) {
+        setConversations(prev => [
+          { id: data.id, title: data.title, resource_count: 0, message_count: 0, updated_at: data.created_at },
+          ...prev,
+        ])
+      } else {
+        // Guest users: volatile current chat only, no history list
+        setConversations([])
+      }
+      loadConversation(data.id)
+    } catch {
+      setErrorNotice('Failed to start a new chat.')
+    }
+  }
+
+  async function deleteConversation(id) {
+    try {
+      await fetch(`${API_URL}/api/chat/conversations/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      })
+      const remaining = conversations.filter(c => c.id !== id)
+      setConversations(remaining)
+      if (activeConvId === id) {
+        if (remaining.length > 0) loadConversation(remaining[0].id)
+        else startNewConversation()
+      }
+    } catch {
+      setErrorNotice('Failed to delete chat.')
+    }
+  }
+
+  // Handle adding resources to active conversation
+  async function handleAddResource({ type, title, text, formData }) {
+    if (!activeConvId) return
+    if (type === 'text') {
+      const res = await fetch(`${API_URL}/api/chat/conversations/${activeConvId}/resources/text`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ text, title }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.detail || 'Could not add text resource.')
+      }
+    } else if (type === 'upload') {
+      const res = await fetch(`${API_URL}/api/chat/conversations/${activeConvId}/resources/upload`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: formData,
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.detail || 'Could not upload resource.')
+      }
+    }
+    // Refresh active conversation and history list
+    await loadConversation(activeConvId)
+    if (currentUser) {
+      await fetchConversations()
+    }
+  }
+
+  // Handle sending a chat message
+  async function handleSendMessage(e) {
+    e?.preventDefault()
+    const text = promptInput.trim()
+    if (!text || !activeConvId) return
+
+    // Enforce resources requirement
+    const hasResources = (currentConvData?.resources?.length || 0) > 0
+    if (!hasResources) {
+      setErrorNotice('⚠️ Please add at least one study resource (text, image, audio, or PDF) using the "+" button before chatting.')
+      setIsResourceModalOpen(true)
+      return
+    }
+
+    setSendingMessage(true)
+    setErrorNotice('')
+    setPromptInput('')
+
+    try {
+      const res = await fetch(`${API_URL}/api/chat/conversations/${activeConvId}/messages`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ prompt: text }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setErrorNotice(data.detail || 'Server error while generating response.')
+      } else {
+        await loadConversation(activeConvId)
+        if (currentUser) {
+          fetchConversations()
+        }
+      }
+    } catch {
+      setErrorNotice('Could not reach backend to send message.')
+    } finally {
+      setSendingMessage(false)
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 200)
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('asc_token')
+    localStorage.removeItem('asc_user')
+    setCurrentUser(null)
+    setConversations([])
+  }
+
+  const hasAttachedResources = (currentConvData?.resources?.length || 0) > 0
+
+  return (
+    <div className={`h-screen w-screen flex overflow-hidden ${darkMode ? 'dark bg-gray-950 text-gray-100' : 'bg-slate-50 text-gray-800'}`}>
+      
+      {/* ── Left Sidebar (Tiers 1 to 5) ── */}
+      <Sidebar
+        conversations={conversations}
+        activeConvId={activeConvId}
+        onSelectConv={loadConversation}
+        onNewConversation={startNewConversation}
+        onDeleteConv={deleteConversation}
+        apiUrl={API_URL}
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthOpen(true)}
+      />
+
+      {/* ── Main Chat Area ── */}
+      <main className="flex-1 h-full flex flex-col min-w-0 bg-white dark:bg-gray-950 relative">
+        
+        {/* Top Navbar */}
+        <header className="h-14 border-b border-gray-100 dark:border-gray-800 px-6 flex items-center justify-between bg-white/80 dark:bg-gray-900/80 backdrop-blur z-10">
+          <div className="flex items-center gap-3">
+            <h2 className="font-extrabold text-sm md:text-base text-gray-800 dark:text-gray-100 truncate">
+              {currentConvData?.title || 'Study Session'}
+            </h2>
+            {hasAttachedResources && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                📎 {currentConvData.resources.length} resource{currentConvData.resources.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Dark / Light Mode Button */}
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm transition-all"
+              title="Toggle Dark/Light Mode"
+            >
+              {darkMode ? '☀️ Light' : '🌙 Dark'}
+            </button>
+
+            {/* User status */}
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-100 dark:bg-gray-800 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold uppercase">
+                    {(currentUser.name || currentUser.email)[0]}
+                  </span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200 hidden md:inline">
+                    {currentUser.name} {currentUser.age ? `(${currentUser.age}y)` : ''}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="px-2.5 py-1 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-gray-500 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 font-bold text-xs transition-all"
+                  title="Sign out (Return to Guest mode)"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAuthOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all"
+              >
+                Sign In / Register
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Dynamic Attached Resources Banner */}
+        {hasAttachedResources && (
+          <div className="bg-indigo-50/50 dark:bg-indigo-950/20 border-b border-indigo-100 dark:border-indigo-900/40 px-6 py-2 flex items-center gap-2 overflow-x-auto text-xs">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 whitespace-nowrap">
+              Active Resources:
+            </span>
+            {currentConvData.resources.map(r => (
+              <div
+                key={r.id}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-900 border border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-300 whitespace-nowrap font-medium text-[11px] shadow-2xs"
+              >
+                <span>{r.resource_type === 'image' ? '🖼️' : r.resource_type === 'audio' ? '🎙️' : r.resource_type === 'file' ? '📄' : '📝'}</span>
+                <span className="truncate max-w-[120px]">{r.title}</span>
+              </div>
+            ))}
+            <button
+              onClick={() => setIsResourceModalOpen(true)}
+              className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold whitespace-nowrap ml-1"
+            >
+              + Add More
+            </button>
+          </div>
+        )}
+
+        {/* Scrollable Message Transcript */}
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-8">
+          
+          {/* Welcome / Empty chat state */}
+          {(!currentConvData?.messages || currentConvData.messages.length === 0) && (
+            <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 border border-indigo-400/30 flex items-center justify-center text-white shadow-xl shadow-indigo-500/20 select-none">
+                <span
+                  className="text-3xl font-bold italic tracking-tighter"
+                  style={{ fontFamily: "'Dancing Script', 'Brush Script MT', 'Great Vibes', 'Caveat', cursive, sans-serif", transform: 'translateY(-2px)' }}
+                >
+                  <span className="text-3xl">ℰ</span><span className="text-2xl font-semibold">ℓ</span>
+                </span>
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-2xl font-black bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
+                  Welcome to EzLearn
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  To get started, attach study notes, images, PDFs, or audio using the{' '}
+                  <strong className="text-indigo-600 dark:text-indigo-400 font-bold">+</strong> button on the input bar below.
+                </p>
+              </div>
+
+              {!hasAttachedResources && (
+                <button
+                  onClick={() => setIsResourceModalOpen(true)}
+                  className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-2"
+                >
+                  <span>➕</span> Add Study Resource to Begin
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Render Turns in Required Order */}
+          {currentConvData?.messages?.map((msg) => (
+            <div key={msg.id} className="space-y-4 max-w-3xl mx-auto">
+              
+              {/* 1. What You Asked */}
+              <div className="flex justify-end">
+                <div className="bg-indigo-600 text-white rounded-3xl rounded-tr-xs px-5 py-3.5 max-w-xl text-sm font-medium shadow-md">
+                  <div className="text-[10px] uppercase font-black text-indigo-200 tracking-wider mb-1">
+                    What You Asked
+                  </div>
+                  <div>{msg.user_prompt}</div>
+                </div>
+              </div>
+
+              {/* Assistant Response Box */}
+              <div className="space-y-4 animate-fadeIn">
+                
+                {/* 2. Explanation */}
+                {msg.explanation && (
+                  <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between pb-2 border-b dark:border-gray-800">
+                      <h4 className="font-extrabold text-base text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <span>💡</span> Explanation: {msg.explanation.topic || 'Concept Overview'}
+                      </h4>
+                      {msg.explanation.external_sources_used && (
+                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full font-bold">
+                          🌐 Synthesized with External Web Knowledge
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Everyday Physical Picture / Analogy First */}
+                    {msg.explanation.real_life_picture && (
+                      <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                        <span className="font-extrabold uppercase tracking-wide block">
+                          🖼️ Everyday Physical Picture:
+                        </span>
+                        <p className="leading-relaxed">{msg.explanation.real_life_picture}</p>
+                      </div>
+                    )}
+
+                    {/* Summary */}
+                    {msg.explanation.summary && (
+                      <p className="text-xs text-gray-700 dark:text-gray-300 font-sans leading-relaxed">
+                        {msg.explanation.summary}
+                      </p>
+                    )}
+
+                    {/* Body */}
+                    {msg.explanation.body && (
+                      <div className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+                        {msg.explanation.body}
+                      </div>
+                    )}
+
+                    {/* Key Technical Terms */}
+                    {msg.explanation.key_terms?.length > 0 && (
+                      <div className="pt-2 border-t dark:border-gray-800 space-y-2">
+                        <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">
+                          Key Terms (English + Meaning)
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {msg.explanation.key_terms.map((kt, kIdx) => (
+                            <div key={kIdx} className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border dark:border-gray-700 text-xs">
+                              <span className="font-bold text-indigo-600 dark:text-indigo-400 block">{kt.term}</span>
+                              <span className="text-[11px] text-gray-500 dark:text-gray-400">{kt.meaning}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Citations */}
+                    {msg.citations?.length > 0 && (
+                      <div className="pt-2 border-t dark:border-gray-800 flex items-center gap-2 flex-wrap text-[11px]">
+                        <span className="font-bold text-gray-400 uppercase">Citations:</span>
+                        {msg.citations.map((c, cIdx) => (
+                          <span key={cIdx} className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-medium">
+                            📄 Page {c.page}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 3. Demonstration / Simulation */}
+                {msg.simulation && (
+                  <ProcessSimulationView plan={msg.simulation} />
+                )}
+
+                {/* 4. 10-Question Quiz (Attempt once / locked results) */}
+                {msg.quiz && (
+                  <TenQuestionQuiz
+                    quizData={msg.quiz}
+                    messageId={msg.id}
+                    convId={activeConvId}
+                    apiUrl={API_URL}
+                    initialAttempt={msg.quiz_attempt}
+                    initialSuggestions={msg.ai_suggestions}
+                  />
+                )}
+
+              </div>
+            </div>
+          ))}
+
+          {/* Loading indicator while AI is generating */}
+          {sendingMessage && (
+            <div className="max-w-xl p-5 bg-white dark:bg-gray-900 rounded-3xl border border-indigo-100 dark:border-gray-800 space-y-2 animate-pulse">
+              <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/3" />
+              <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-full" />
+              <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-4/5" />
+              <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold pt-2">
+                ✨ Generating explanation, simulation, and 10-question quiz…
+              </p>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Error Notice */}
+        {errorNotice && (
+          <div className="mx-6 mb-2 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-2xl text-xs text-rose-700 dark:text-rose-300 font-medium flex items-center justify-between">
+            <span>{errorNotice}</span>
+            <button onClick={() => setErrorNotice('')} className="font-bold ml-2">✕</button>
+          </div>
+        )}
+
+        {/* ── Chatbot Input Bar (Gemini Webapp Style) ── */}
+        <div className="p-4 md:p-6 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
+          <form
+            onSubmit={handleSendMessage}
+            className={`max-w-3xl mx-auto flex items-center gap-2 p-2 rounded-3xl border transition-all ${
+              hasAttachedResources
+                ? 'border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 focus-within:ring-2 focus-within:ring-indigo-400 focus-within:border-indigo-400'
+                : 'border-amber-300 bg-amber-50/20 dark:bg-gray-900 cursor-not-allowed'
+            }`}
+          >
+            {/* Leftmost '+' button for adding resources */}
+            <button
+              type="button"
+              onClick={() => setIsResourceModalOpen(true)}
+              className="w-10 h-10 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-lg font-black transition-all shadow-2xs"
+              title="Add Resource (Text, Image, Audio, File)"
+            >
+              +
+            </button>
+
+            {/* Input Text Box */}
+            <input
+              type="text"
+              value={promptInput}
+              onChange={e => setPromptInput(e.target.value)}
+              disabled={!hasAttachedResources || sendingMessage}
+              placeholder={
+                hasAttachedResources
+                  ? 'Ask anything about your attached notes…'
+                  : 'Add resources first using "+" to enable chat…'
+              }
+              className="flex-1 bg-transparent px-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none disabled:cursor-not-allowed"
+            />
+
+            {/* Rightmost Submit Button */}
+            <button
+              type="submit"
+              disabled={!hasAttachedResources || !promptInput.trim() || sendingMessage}
+              className="w-10 h-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              title="Send Message"
+            >
+              ➔
+            </button>
+          </form>
+
+          {!hasAttachedResources && (
+            <p className="text-center text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1.5">
+              ⚠️ Strict Study Resource Rule: Click <strong>+</strong> to add study notes before typing.
+            </p>
+          )}
+        </div>
+
+      </main>
+
+      {/* ── Modal for Adding Resources ── */}
+      <ResourceModal
+        isOpen={isResourceModalOpen}
+        onClose={() => setIsResourceModalOpen(false)}
+        onAddResource={handleAddResource}
+      />
+
+      {/* ── Auth Modal ── */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onAuthSuccess={(user) => setCurrentUser(user)}
+        apiUrl={API_URL}
+      />
+
+    </div>
+  )
+}

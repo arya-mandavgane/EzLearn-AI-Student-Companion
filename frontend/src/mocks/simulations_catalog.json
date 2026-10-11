@@ -1,0 +1,4 @@
+[
+  { "id": "stack", "title": "Stack", "keywords": ["stack", "push", "pop", "lifo"], "description": "Last-In, First-Out plate pile" },
+  { "id": "queue", "title": "Queue", "keywords": ["queue", "enqueue", "dequeue", "fifo"], "description": "First-In, First-Out people line" }
+]

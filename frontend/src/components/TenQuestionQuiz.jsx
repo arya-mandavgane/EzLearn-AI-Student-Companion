@@ -1,0 +1,247 @@
+import React, { useState } from 'react'
+
+export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAttempt, initialSuggestions }) {
+  const questions = quizData?.questions || []
+  const [answers, setAnswers] = useState({}) // { [qId]: option }
+  const [attemptResult, setAttemptResult] = useState(initialAttempt || null)
+  const [aiSuggestions, setAiSuggestions] = useState(initialSuggestions || '')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [userComment, setUserComment] = useState('')
+  const [commentSent, setCommentSent] = useState(false)
+
+  // If already attempted, lock into result review view (Attempt Once)
+  const isLocked = Boolean(attemptResult)
+
+  const currentQ = questions[currentIdx] || {}
+  const total = questions.length
+
+  function handleSelect(opt) {
+    if (isLocked) return
+    setAnswers(prev => ({ ...prev, [currentQ.id]: opt }))
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true)
+    setError('')
+    try {
+      const payload = {
+        message_id: messageId,
+        answers: questions.map(q => ({
+          question_id: q.id,
+          answer: answers[q.id] || '',
+        })),
+      }
+      const token = localStorage.getItem('asc_token')
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const res = await fetch(`${apiUrl}/api/chat/conversations/${convId}/messages/${messageId}/submit-quiz`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.detail || 'Could not submit quiz.')
+      } else {
+        setAttemptResult(data.quiz_attempt)
+        setAiSuggestions(data.ai_suggestions)
+      }
+    } catch {
+      setError('Network error while scoring quiz.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (total === 0) return null
+
+  // ── RESULT & REVIEW VIEW (Attempted & Locked) ──
+  if (isLocked && attemptResult) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-indigo-100 dark:border-gray-700 p-5 space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🏆</span>
+            <div>
+              <h4 className="font-extrabold text-gray-900 dark:text-gray-100 text-sm">
+                Quiz Results (Attempt Locked)
+              </h4>
+              <p className="text-[11px] text-gray-400">Attempted Once • Cannot be retaken</p>
+            </div>
+          </div>
+          <div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-700 rounded-full font-mono text-xs font-black text-indigo-700 dark:text-indigo-300">
+            {attemptResult.score} / {attemptResult.total} ({attemptResult.accuracy_pct}%)
+          </div>
+        </div>
+
+        {/* AI Pedagogical Suggestions */}
+        {aiSuggestions && (
+          <div className="bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-2 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-300 uppercase tracking-wide">
+              <span>🤖</span> AI Performance Assessment & Suggestions
+            </div>
+            <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+              {aiSuggestions}
+            </p>
+          </div>
+        )}
+
+        {/* Weak Topics to Review */}
+        {attemptResult.weak_topics?.length > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-xs text-amber-900 dark:text-amber-300">
+            <strong>📌 Must-Do Revision Topics:</strong> {attemptResult.weak_topics.join(', ')}
+          </div>
+        )}
+
+        {/* Question Review Breakdown */}
+        <div className="space-y-3">
+          <h5 className="font-bold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Question Breakdown
+          </h5>
+          {attemptResult.results?.map((r, i) => (
+            <div
+              key={r.id}
+              className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                r.is_correct
+                  ? 'border-green-200 bg-green-50/40 dark:bg-green-950/20 text-gray-800 dark:text-gray-200'
+                  : 'border-rose-200 bg-rose-50/40 dark:bg-rose-950/20 text-gray-800 dark:text-gray-200'
+              }`}
+            >
+              <div className="flex justify-between font-bold">
+                <span>{i + 1}. {r.question}</span>
+                <span className={r.is_correct ? 'text-green-600' : 'text-rose-600'}>
+                  {r.is_correct ? '✅ Correct' : '❌ Missed'}
+                </span>
+              </div>
+              {!r.is_correct && r.student_answer && (
+                <div className="text-[11px] text-gray-500">
+                  Your answer: <span className="font-semibold text-rose-700">{r.student_answer}</span>
+                </div>
+              )}
+              <div className="text-[11px] text-indigo-700 dark:text-indigo-300">
+                Correct answer: <span className="font-bold">{r.correct_answer}</span>
+              </div>
+              {r.explanation && (
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 italic">
+                  💡 {r.explanation}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Student Feedback Comments */}
+        <div className="pt-2 border-t dark:border-gray-700 space-y-2">
+          <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+            💬 Have thoughts or questions on this quiz?
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={userComment}
+              onChange={e => setUserComment(e.target.value)}
+              placeholder="e.g. Question 4 was tricky or I need more details on LIFO..."
+              className="flex-1 border dark:border-gray-700 rounded-xl px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <button
+              onClick={() => { setCommentSent(true); setUserComment('') }}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold"
+            >
+              Send
+            </button>
+          </div>
+          {commentSent && (
+            <p className="text-[11px] text-emerald-600 font-bold">Thank you for your comments!</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ── ACTIVE QUIZ TAKER (Single Attempt Mode) ──
+  const isAnswered = Boolean(answers[currentQ.id])
+  const answeredCount = Object.keys(answers).length
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-indigo-100 dark:border-gray-700 p-5 space-y-4">
+      <div className="flex items-center justify-between pb-2 border-b dark:border-gray-700">
+        <div>
+          <h4 className="font-extrabold text-indigo-700 dark:text-indigo-400 text-sm">
+            🎯 10-Question Knowledge Check
+          </h4>
+          <p className="text-[11px] text-gray-400">Attempt Once • Test your mastery</p>
+        </div>
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+          Q {currentIdx + 1} / {total}
+        </span>
+      </div>
+
+      {/* Question prompt */}
+      <div className="text-xs font-bold text-gray-800 dark:text-gray-200 leading-relaxed">
+        {currentQ.question}
+      </div>
+
+      {/* Options */}
+      <div className="space-y-2">
+        {currentQ.options?.map((opt, oIdx) => {
+          const selected = answers[currentQ.id] === opt
+          return (
+            <button
+              key={oIdx}
+              type="button"
+              onClick={() => handleSelect(opt)}
+              className={`w-full text-left p-3 rounded-xl border text-xs font-medium transition-all ${
+                selected
+                  ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 ring-2 ring-indigo-400'
+                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <span className="font-bold mr-2 text-indigo-500">{String.fromCharCode(65 + oIdx)}.</span>
+              {opt}
+            </button>
+          )
+        })}
+      </div>
+
+      {error && <div className="text-xs text-rose-600 font-bold">⚠️ {error}</div>}
+
+      {/* Navigation & Submit */}
+      <div className="flex items-center justify-between pt-2">
+        <button
+          type="button"
+          onClick={() => setCurrentIdx(prev => Math.max(0, prev - 1))}
+          disabled={currentIdx === 0}
+          className="px-3 py-1.5 rounded-lg border dark:border-gray-700 text-xs font-bold disabled:opacity-30"
+        >
+          ◀ Prev
+        </button>
+
+        <span className="text-[11px] text-gray-400 font-medium">
+          Answered {answeredCount} / {total}
+        </span>
+
+        {currentIdx < total - 1 ? (
+          <button
+            type="button"
+            onClick={() => setCurrentIdx(prev => Math.min(total - 1, prev + 1))}
+            className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold"
+          >
+            Next ▶
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-4 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-bold disabled:opacity-50"
+          >
+            {submitting ? 'Scoring…' : '🏁 Submit Quiz'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}

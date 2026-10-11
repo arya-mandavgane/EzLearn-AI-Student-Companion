@@ -1,0 +1,27 @@
+{
+  "id": "mock-explain-001",
+  "topic": "Stack",
+  "subtopic": "LIFO Principle",
+  "topic_type": "simulation",
+  "language": "en",
+  "summary": "A stack is like a pile of plates. The last plate you put on is the first one you take off.",
+  "real_life_picture": "Imagine a pile of plates in a cafeteria. You always take the top plate first.",
+  "sections": [
+    {
+      "heading": "What is a Stack?",
+      "body_markdown": "A **stack** is a linear data structure that follows the **Last-In, First-Out (LIFO)** principle.",
+      "citations": []
+    }
+  ],
+  "key_terms": [
+    { "term": "LIFO", "meaning": "Last item added is the first item removed" },
+    { "term": "Push", "meaning": "Adding an item to the top" },
+    { "term": "Pop", "meaning": "Removing the top item" }
+  ],
+  "simulation_id": "stack",
+  "table": null,
+  "worked_example_steps": [],
+  "not_found_in_notes": false,
+  "confidence": "high",
+  "warnings": []
+}

@@ -593,7 +593,6 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         onAuthSuccess={(user) => setCurrentUser(user)}
         apiUrl={API_URL}
-        onUpdateApiUrl={(newUrl) => setApiUrl(newUrl)}
       />
 
     </div>

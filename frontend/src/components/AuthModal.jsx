@@ -5,7 +5,6 @@ export default function AuthModal({
   onClose,
   onAuthSuccess,
   apiUrl = 'http://localhost:8000',
-  onUpdateApiUrl,
 }) {
   const [mode, setMode] = useState('login') // 'login' | 'register'
   const [email, setEmail] = useState('')
@@ -15,23 +14,6 @@ export default function AuthModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [customApiUrl, setCustomApiUrl] = useState(apiUrl)
-  const [showCustomBackend, setShowCustomBackend] = useState(false)
-
-  const isLocalhostOnHosted = typeof window !== 'undefined' &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1' &&
-    apiUrl.includes('localhost')
-
-  function handleSaveCustomApiUrl() {
-    const clean = customApiUrl.trim().replace(/\/+$/, '').replace(/\/api$/, '')
-    if (clean) {
-      localStorage.setItem('ezlearn_api_url', clean)
-      if (onUpdateApiUrl) onUpdateApiUrl(clean)
-      setNotice(`Connected to: ${clean}`)
-      setShowCustomBackend(false)
-    }
-  }
 
   if (!isOpen) return null
 
@@ -261,55 +243,6 @@ export default function AuthModal({
           >
             Continue as Guest (limited features) →
           </button>
-        </div>
-
-        {/* ── Target Backend Address Indicator & Configurator ── */}
-        <div className="pt-2 border-t border-gray-100 text-[11px] text-gray-500">
-          <div className="flex items-center justify-between gap-1 text-[10px]">
-            <span className="font-medium">Target Backend:</span>
-            <code className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-indigo-600 truncate max-w-[190px]" title={apiUrl}>
-              {apiUrl}
-            </code>
-          </div>
-
-          {(isLocalhostOnHosted || showCustomBackend) ? (
-            <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-left text-amber-900">
-              <span className="font-bold block text-[11px] text-amber-800">
-                ⚙️ Backend Address Configurator:
-              </span>
-              <p className="text-[10px] text-amber-700 mb-1.5 leading-tight">
-                {isLocalhostOnHosted
-                  ? "Frontend is still pointing to localhost:8000. Paste your live Render backend URL below to connect:"
-                  : "Change backend URL to connect to a different server:"}
-              </p>
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  placeholder="https://ezlearn-backend.onrender.com"
-                  value={customApiUrl}
-                  onChange={(e) => setCustomApiUrl(e.target.value)}
-                  className="flex-1 px-2.5 py-1 bg-white border border-amber-300 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveCustomApiUrl}
-                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs shadow-xs"
-                >
-                  Save & Connect
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center mt-1">
-              <button
-                type="button"
-                onClick={() => setShowCustomBackend(true)}
-                className="text-[10px] text-gray-400 hover:text-indigo-600 underline"
-              >
-                Change backend address
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

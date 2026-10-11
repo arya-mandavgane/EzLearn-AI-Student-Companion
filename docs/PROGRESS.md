@@ -24,11 +24,11 @@ Last updated: 2026-10-11 — Brand Updated to EzLearn (ℰℓ Logo), Navbar Clea
   - Guest users only have volatile access to their current chat session; chat history and performance reports are strictly locked to registered signed-in users.
   - All mock/dummy users and chat records cleared from SQLite database.
 - **Deployment & Cloud Hosting**:
-  - `render.yaml` & `backend/start.py`: Configured Render Blueprint for 1-click backend deployment with dynamic `PORT` binding and health check support.
-  - `vercel.json`: Added Vercel configuration for 1-click frontend deployment with SPA routing.
-  - `frontend/src/App.jsx` & `frontend/src/lib/api.js`: Normalized `API_URL` to strip trailing slashes and support `VITE_API_URL`.
-  - `frontend/src/components/AuthModal.jsx`: Added cold-start timeout handling and wake-up feedback for Render free tier.
+  - `render.yaml` & `backend/start.py`: Configured Render Blueprint for 1-click backend deployment with dynamic `PORT` binding, health check support, and robust CORS parsing. Backend is verified live on Render.
+  - `vercel.json`: Added Vercel configuration for 1-click frontend deployment with SPA routing. Frontend is verified live on Vercel.
+  - `frontend/src/App.jsx` & `frontend/src/lib/api.js`: Full-stack integration verified with seamless user registration, JWT authentication, and guest session isolation.
 - **Verification**:
+  - Full-stack live authentication verified end-to-end between Vercel and Render.
   - Frontend production build (`npm run build`) succeeded with 0 errors.
   - Backend automated test suite (33 tests in `app/tests`) passed with 100% OK.
 

@@ -23,6 +23,11 @@ Last updated: 2026-10-11 — Brand Updated to EzLearn (ℰℓ Logo), Navbar Clea
   - User registration collects `name`, `email`, `age`, and password.
   - Guest users only have volatile access to their current chat session; chat history and performance reports are strictly locked to registered signed-in users.
   - All mock/dummy users and chat records cleared from SQLite database.
+- **Deployment & Cloud Hosting**:
+  - `render.yaml` & `backend/start.py`: Configured Render Blueprint for 1-click backend deployment with dynamic `PORT` binding and health check support.
+  - `vercel.json`: Added Vercel configuration for 1-click frontend deployment with SPA routing.
+  - `frontend/src/App.jsx` & `frontend/src/lib/api.js`: Normalized `API_URL` to strip trailing slashes and support `VITE_API_URL`.
+  - `frontend/src/components/AuthModal.jsx`: Added cold-start timeout handling and wake-up feedback for Render free tier.
 - **Verification**:
   - Frontend production build (`npm run build`) succeeded with 0 errors.
   - Backend automated test suite (33 tests in `app/tests`) passed with 100% OK.

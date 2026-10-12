@@ -359,43 +359,144 @@ def send_chat_message(
     if not prompt:
         raise HTTPException(status_code=422, detail="Message cannot be empty.")
 
-    # Aggregate conversation resources
+    # Aggregate ALL conversation resources (regardless of when they were added)
     combined_notes = "\n\n---\n\n".join(
         f"[{r.resource_type.upper()} RESOURCE: {r.title}]\n{r.content}" for r in conv.resources
     )
 
     # 2. RAG retrieval over this conversation's indexed chunks
     q_vec = embed([prompt])[0] if embed([prompt]) else None
-    search_res = global_vector_store.search(query=prompt, query_embedding=q_vec, top_k=4)
-    relevant_chunks = [c for c, score in search_res if score >= 0.25]
+    search_res = global_vector_store.search(query=prompt, query_embedding=q_vec, top_k=6)
+    relevant_chunks = [c for c, score in search_res if score >= 0.28]
 
     citations = [
         {"page": c.page, "snippet": c.snippet, "chunk_id": c.chunk_id} for c in relevant_chunks
     ]
 
-    # External web references flag if internal coverage is low
+    # Check if the question is an outlier topic (not covered in any of the attached resources)
+    outlier_check_prompt = f"""You are analyzing a student query against their study materials.
+STUDENT QUESTION: {prompt}
+
+ATTACHED STUDY RESOURCES:
+{combined_notes[:6000]}
+
+Is the topic or question fundamentally covered or mentioned in ANY of the attached study resources?
+Answer with valid JSON:
+{{
+  "is_outlier": true | false,
+  "confidence": 0.0 to 1.0,
+  "reason": "Brief reason why it is or is not an outlier"
+}}
+"""
+    raw_check = generate(outlier_check_prompt)
+    is_outlier = False
+    try:
+        from app.api.explain import _parse_ai_json
+        check_data = _parse_ai_json(raw_check, expected_type=dict)
+        if isinstance(check_data, dict):
+            is_outlier = bool(check_data.get("is_outlier", False))
+    except Exception:
+        # Fallback heuristic: if no chunk matched above threshold and combined notes don't share keywords
+        is_outlier = len(relevant_chunks) == 0
+
+    # ── CASE A: OUTLIER TOPIC ───────────────────────────────────────────────────
+    # If question is NOT in any of the resources:
+    # 1. Specifically tell user this is an outlier topic not present in their resources
+    # 2. Give ONLY a single paragraph explanation
+    # 3. DO NOT generate any simulation or quiz
+    if is_outlier:
+        outlier_exp_prompt = f"""The student asked about a topic that is NOT present in any of their attached study resources.
+STUDENT QUESTION: {prompt}
+
+Provide a response adhering strictly to these rules:
+1) State clearly that this topic was not found in their attached study resources.
+2) Provide a single concise, clear explanation paragraph addressing their question directly.
+3) Do not write multiple sections, bulleted lists, simulations, or quiz questions. Just one clean, well-written paragraph.
+
+Respond with valid JSON:
+{{
+  "topic": "{prompt}",
+  "is_outlier": true,
+  "notice": "This topic was not found in any of your attached study resources. Here is a brief overview to help you understand it:",
+  "paragraph_explanation": "Single paragraph concise explanation of the topic."
+}}
+"""
+        raw_outlier = generate(outlier_exp_prompt)
+        try:
+            from app.api.explain import _parse_ai_json
+            outlier_data = _parse_ai_json(raw_outlier, expected_type=dict)
+            if not isinstance(outlier_data, dict):
+                outlier_data = {}
+        except Exception:
+            outlier_data = {}
+
+        paragraph = outlier_data.get("paragraph_explanation") or f"This topic ('{prompt}') is not mentioned in any of your attached study resources. In general, {prompt} refers to a concept commonly explored in related fields, functioning as a foundational principle to help address specific problems."
+        notice = outlier_data.get("notice") or "This topic was not found in any of your attached study resources. Here is a brief single-paragraph overview:"
+
+        explanation_data = {
+            "topic": prompt,
+            "is_outlier": True,
+            "outlier_notice": notice,
+            "body": paragraph,
+            "summary": paragraph,
+            "real_life_picture": None,
+            "key_terms": [],
+            "external_sources_used": True,
+        }
+
+        # Save record with NO simulation and NO quiz
+        msg_id = str(uuid.uuid4())
+        msg = MessageRecord(
+            id=msg_id,
+            conversation_id=conv_id,
+            role="assistant",
+            user_prompt=prompt,
+            explanation_json=json.dumps(explanation_data),
+            simulation_json=None,
+            quiz_json=None,
+            citations_json=json.dumps([]),
+            ai_suggestions=None,
+        )
+        db.add(msg)
+        conv.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        return {
+            "message_id": msg_id,
+            "user_prompt": prompt,
+            "explanation": explanation_data,
+            "simulation": None,
+            "quiz": None,
+            "citations": [],
+            "used_external_web": True,
+            "is_outlier": True,
+        }
+
+    # ── CASE B: COVERED IN RESOURCES ──────────────────────────────────────────
+    # Synthesize across ALL attached resources in this conversation
     used_external_web = len(relevant_chunks) == 0
 
     # 3. Step 2: Generate Explanation
-    exp_prompt = f"""You are AI Study Companion. Answer the user prompt based on their attached study resources.
+    exp_prompt = f"""You are AI Study Companion. Answer the user prompt by thoroughly considering and synthesizing ALL attached study resources in this chat.
 USER PROMPT: {prompt}
 
-ATTACHED RESOURCES CONTEXT:
-{combined_notes[:4000]}
+ATTACHED RESOURCES IN THIS CHAT (Consider all):
+{combined_notes[:6000]}
 
 Follow the Beginner Rule:
 1) Everyday real-life picture / physical analogy FIRST.
 2) Clear concept summary in 2-3 plain sentences.
-3) Structured explanation with key points.
+3) Structured explanation with key points drawn from the attached resources.
 4) Technical terms in English with plain definitions.
 
 Respond with valid JSON:
 {{
   "topic": "Main Topic",
+  "is_outlier": false,
   "topic_type": "analogy" | "comparison_table" | "worked_example" | "simulation",
   "real_life_picture": "Everyday physical picture",
   "summary": "Plain 2-3 sentence summary",
-  "body": "Detailed explanation with points",
+  "body": "Detailed explanation synthesized from all attached resources",
   "key_terms": [{{"term": "Term", "meaning": "Meaning"}}],
   "external_sources_used": {str(used_external_web).lower()}
 }}
@@ -410,6 +511,7 @@ Respond with valid JSON:
         explanation_data = {}
 
     # Guarantee required fields are present even in mock mode or fallback
+    explanation_data["is_outlier"] = False
     if "real_life_picture" not in explanation_data:
         explanation_data["real_life_picture"] = (
             explanation_data.get("simple_explanation")
@@ -468,15 +570,14 @@ Return valid JSON:
             "analogy": "A factory assembly line turning raw inputs into results.",
         }
 
-    # 5. Step 4: Generate 10-Question Quiz
+    # 5. Step 4: Generate 10-Question Quiz based on all attached resources
     quiz_res = generate_quiz(QuizGenerateRequest(text=combined_notes[:4000], num_questions=10))
-    # Fetch questions with answers stored in backend quiz store
     from app.api.quiz import _quizzes
     backend_quiz = _quizzes.get(quiz_res.quiz_id, {})
     quiz_payload = {
         "quiz_id": quiz_res.quiz_id,
         "questions": [q.model_dump() for q in quiz_res.questions],
-        "stored_questions": backend_quiz.get("questions", []),  # includes correct_answer for scoring
+        "stored_questions": backend_quiz.get("questions", []),
     }
 
     # Record message in DB

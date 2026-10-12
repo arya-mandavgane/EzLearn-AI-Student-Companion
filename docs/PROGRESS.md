@@ -1,10 +1,21 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Direct Chat Text Box Enabled, Quiz Feedback Removed & Visual Simulation Canvas Added ✅
+Last updated: 2026-10-12 — Multi-Resource Synthesis Across All Timings & Outlier Topic Handling Verified ✅
 
 ---
 
 ## ✅ Done
+
+### Multi-Resource Synthesis & Outlier Topic Handling (EzLearn)
+- **Universal Multi-Resource Synthesis**:
+  - The chat backend now aggregates all attached resources across the entire conversation (`conv.resources`), regardless of when they were uploaded (at conversation start or added mid-conversation).
+  - Explanations, simulations, and quizzes synthesize content collectively across all attached documents, images, audio transcripts, and text notes.
+- **Specific Outlier Topic Handling**:
+  - Automatically evaluates incoming queries against all attached study resources to detect if the question is an outlier topic (not covered in any of the materials).
+  - **Outlier Protocol**:
+    1. Specifically alerts the user: *"⚠️ Outlier Topic (Not Found in Resources)"* with an explicit notice that this topic was not found in their attached materials.
+    2. Provides **only a single concise paragraph explanation** of the outlier topic.
+    3. **Suppresses simulations and quizzes** completely for outlier topics to prevent confusing or irrelevant practice questions.
 
 ### Direct Question Typing & Visual Simulation Upgrades (EzLearn)
 - **Always-Enabled Chat Text Box**:

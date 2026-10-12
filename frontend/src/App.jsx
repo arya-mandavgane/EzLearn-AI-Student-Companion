@@ -701,19 +701,31 @@ export default function App() {
                 {/* 2. Explanation */}
                 {msg.explanation && (
                   <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 space-y-4 shadow-sm">
-                    <div className="flex items-center justify-between pb-2 border-b dark:border-gray-800">
+                    <div className="flex items-center justify-between pb-2 border-b dark:border-gray-800 flex-wrap gap-2">
                       <h4 className="font-extrabold text-base text-gray-900 dark:text-gray-100 flex items-center gap-2">
                         <span>💡</span> Explanation: {msg.explanation.topic || 'Concept Overview'}
                       </h4>
-                      {msg.explanation.external_sources_used && (
-                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full font-bold">
+                      {msg.explanation.is_outlier ? (
+                        <span className="text-[10px] bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+                          <span>⚠️</span> Outlier Topic (Not Found in Resources)
+                        </span>
+                      ) : msg.explanation.external_sources_used ? (
+                        <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-full font-bold">
                           🌐 Synthesized with External Web Knowledge
                         </span>
-                      )}
+                      ) : null}
                     </div>
 
-                    {/* Everyday Physical Picture / Analogy First */}
-                    {msg.explanation.real_life_picture && (
+                    {/* Outlier Notice */}
+                    {msg.explanation.outlier_notice && (
+                      <div className="p-3 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs text-amber-900 dark:text-amber-200 font-medium leading-relaxed flex items-start gap-2">
+                        <span className="text-base shrink-0 leading-none">ℹ️</span>
+                        <span>{msg.explanation.outlier_notice}</span>
+                      </div>
+                    )}
+
+                    {/* Everyday Physical Picture / Analogy First (for regular topics) */}
+                    {!msg.explanation.is_outlier && msg.explanation.real_life_picture && (
                       <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-xs text-amber-900 dark:text-amber-200 space-y-1">
                         <span className="font-extrabold uppercase tracking-wide block">
                           🖼️ Everyday Physical Picture:
@@ -722,8 +734,8 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* Summary */}
-                    {msg.explanation.summary && (
+                    {/* Summary (for regular topics) */}
+                    {!msg.explanation.is_outlier && msg.explanation.summary && (
                       <p className="text-xs text-gray-700 dark:text-gray-300 font-sans leading-relaxed">
                         {msg.explanation.summary}
                       </p>

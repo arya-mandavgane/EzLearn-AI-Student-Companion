@@ -670,12 +670,22 @@ Return valid JSON:
             "analogy": "A factory assembly line turning raw inputs into completed products.",
         }
 
-    # 5. Step 4: Generate 10-Question Quiz based on all attached resources
-    quiz_res = generate_quiz(QuizGenerateRequest(text=combined_notes[:4000], num_questions=10))
+    # 5. Step 4: Generate 5-Question Quiz focused specifically on the student's asked topic/query
+    quiz_topic = explanation_data.get("topic") or prompt
+    # Prioritize topic-relevant retrieved chunks, combined with notes context
+    chunk_context = "\n\n".join(f"[EXCERPT - Page {c.page}]:\n{c.snippet or c.content}" for c in relevant_chunks[:6]) if relevant_chunks else ""
+    quiz_context = f"{chunk_context}\n\n---\n\n{combined_notes[:4000]}" if chunk_context else combined_notes[:4000]
+
+    quiz_res = generate_quiz(QuizGenerateRequest(
+        text=quiz_context,
+        num_questions=5,
+        topic=quiz_topic,
+    ))
     from app.api.quiz import _quizzes
     backend_quiz = _quizzes.get(quiz_res.quiz_id, {})
     quiz_payload = {
         "quiz_id": quiz_res.quiz_id,
+        "topic": quiz_topic,
         "questions": [q.model_dump() for q in quiz_res.questions],
         "stored_questions": backend_quiz.get("questions", []),
     }

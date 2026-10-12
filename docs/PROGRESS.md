@@ -1,10 +1,23 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Active Build Telemetry & Dual-Schema Grounding Live Check Added ✅
+Last updated: 2026-10-12 — 5-Question Topic-Focused Knowledge Check Quiz ✅
 
 ---
 
 ## ✅ Done
+
+### 5-Question Topic-Focused Knowledge Check Quiz (EzLearn)
+- **Topic-Specific Selection & Prompt Engineering (`backend/app/api/chat.py`, `backend/app/api/quiz.py`)**:
+  - Replaced the generic 10-question quiz with a focused **5-question quiz** (4 MCQs + 1 short answer).
+  - Rather than randomly querying the entire multi-topic document (e.g. testing Waterfall questions when the user asked about Scrum), the quiz generation prompt now passes `topic=quiz_topic` derived from the extracted explanation topic or student prompt.
+  - Prioritizes top retrieved semantic RAG excerpts (`relevant_chunks[:6]`) directly related to the user's topic query into the quiz generation context window.
+  - Added strict quiz prompt directive: `CRITICAL: Every question must be directly focused on the topic '{topic}' and answerable strictly from the notes below.`
+  - Cache key updated to include the question count and topic hash (`f"{text}|{req.num_questions}|{req.topic or ''}"`).
+- **Dynamic Quiz Schema & UI (`backend/app/schemas/quiz.py`, `frontend/src/components/TenQuestionQuiz.jsx`)**:
+  - `QuizGenerateRequest` updated with `num_questions: int = Field(5, ge=1, le=15)` and `topic: Optional[str] = None`.
+  - Dynamic UI header: displays `🎯 {total}-Question Knowledge Check: {topic}` and `Quiz Results: {topic} (Attempt Locked)` instead of hardcoded 10-question headers.
+  - Evaluated performance assessment thresholds dynamically against `attemptResult.accuracy_pct` (>= 80% for mastery, >= 50% for good effort) rather than hardcoded 8/10 scores.
+
 
 ### Active Build Telemetry & Live Version Indicator (EzLearn)
 - **Live Build Verification Probe (`/api/health`)**:

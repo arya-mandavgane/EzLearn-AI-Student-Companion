@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field
 class QuizGenerateRequest(BaseModel):
     text: Optional[str] = Field(None, description="Study notes")
     document_id: Optional[str] = Field(None, description="Document ID")
-    num_questions: int = Field(10, ge=1, le=15, description="Total questions to generate (default 10)")
+    num_questions: int = Field(5, ge=1, le=15, description="Total questions to generate (default 5)")
+    topic: Optional[str] = Field(None, description="Specific topic or user query to focus the quiz on")
 
 
 class QuizQuestion(BaseModel):

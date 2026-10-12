@@ -65,7 +65,7 @@ export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAt
             <span className="text-2xl">🏆</span>
             <div>
               <h4 className="font-extrabold text-gray-900 dark:text-gray-100 text-sm">
-                Quiz Results (Attempt Locked)
+                Quiz Results{quizData?.topic ? `: ${quizData.topic}` : ''} (Attempt Locked)
               </h4>
               <p className="text-[11px] text-gray-400">Attempted Once • Cannot be retaken</p>
             </div>
@@ -94,9 +94,9 @@ export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAt
           ) : (
             <div className="space-y-2">
               <p className="text-gray-800 dark:text-gray-200 leading-relaxed font-medium">
-                {attemptResult.score >= 8
+                {attemptResult.accuracy_pct >= 80
                   ? `Outstanding mastery! You achieved ${attemptResult.score}/${attemptResult.total} (${attemptResult.accuracy_pct}%). You demonstrate a solid grasp of core fundamentals.`
-                  : attemptResult.score >= 5
+                  : attemptResult.accuracy_pct >= 50
                   ? `Good effort! You scored ${attemptResult.score}/${attemptResult.total} (${attemptResult.accuracy_pct}%). You have a solid base, but key areas need targeted revision.`
                   : `Needs revision: You scored ${attemptResult.score}/${attemptResult.total} (${attemptResult.accuracy_pct}%). Don't worry — review the concept notes and re-check the missed questions below.`}
               </p>
@@ -172,7 +172,7 @@ export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAt
       <div className="flex items-center justify-between pb-2 border-b dark:border-gray-700">
         <div>
           <h4 className="font-extrabold text-indigo-700 dark:text-indigo-400 text-sm">
-            🎯 10-Question Knowledge Check
+            🎯 {total}-Question Knowledge Check{quizData?.topic ? `: ${quizData.topic}` : ''}
           </h4>
           <p className="text-[11px] text-gray-400">Attempt Once • Test your mastery</p>
         </div>

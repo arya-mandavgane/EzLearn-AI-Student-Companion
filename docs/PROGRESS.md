@@ -1,19 +1,21 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Direct Topic Coverage Audit & Generic Term Filtering Implemented (Blocked Math/Off-Topic Leaks) ✅
+Last updated: 2026-10-12 — Three-Tier Fail-Safe Grounding Guard & Generation Fallback Implemented ✅
 
 ---
 
 ## ✅ Done
 
-### Direct Topic Coverage Audit & Generic Term Filtering (EzLearn)
-- **Eliminated False-Positive Academic Matches**:
-  - Filtered generic academic words ("formula", "theorem", "law", "rule", "definition", "concept", "method") from keyword overlap matching so they cannot cause questions like "pythagoras theorem formula" to match computer science notes (which mention words like "formula" or "Master Theorem").
-- **Strict `is_covered_in_notes` Direct Audit**:
-  - Replaced ambiguous domain matching with a direct binary audit: *"Is the topic of the question ('{prompt}') actually taught or present in the uploaded notes?"*.
-  - If the uploaded notes are about Computer Science and the question asks about Math/Geometry (e.g. Pythagoras theorem), Geography, or other subjects not in the notes, `is_covered_in_notes` evaluates to `false`.
-- **Zero Shared Topic Tokens Hard Enforcement**:
-  - If the question contains zero topic keywords shared with the uploaded notes (`len(shared_tokens) == 0`), it is hard-rejected immediately without exception.
+### Three-Tier Fail-Safe Grounding Guard & Generation Fallback (EzLearn)
+- **Eliminated False-Positive Academic Matches & Prompt Overrides**:
+  - Expanded generic academic stopwords ("formula", "theorem", "law", "rule", "definition", "concept", "method", "show", "state", "find", "calculate", "list", "name", "help", "solve", "detail", "provide", "information", "discuss", "know", "check", "need") to eliminate false lexical overlap between student questions and uploaded materials.
+  - **Deterministic Lexical Gate**: If the question's content tokens have zero overlap with the uploaded notes (`len(q_tokens) > 0 and len(shared_tokens) == 0`), the query is unconditionally rejected before LLM generation.
+- **Direct Binary Topic Audit**:
+  - `is_covered_in_notes` verification prompt queries Gemini with `temperature=0.0`: *"Is the topic of the question ('{prompt}') actually taught or present in the uploaded notes?"*. If false, query is rejected immediately.
+- **Fail-Safe Generation Guard (Case B Fallback)**:
+  - Added strict negative instruction to `exp_prompt`: if the concept is not present in the notes, Gemini is instructed to return `is_outlier: true` and `body: null`.
+  - Added backend safety check: if `explanation_data.get("is_outlier") is True` or `not explanation_data.get("body")`, execution falls back to Case A rejection, preventing ungrounded general world knowledge, formulas, simulations, or quizzes from ever being returned.
+
 
 ### Strict Multi-Layer Domain Alignment & Lexical Gating (EzLearn)
 - **Root Cause Resolution**:

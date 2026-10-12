@@ -392,6 +392,8 @@ def send_chat_message(
         "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only",
         "own", "same", "so", "than", "too", "very", "explain", "tell", "describe",
         "give", "write", "define", "summary", "notes", "question", "answer", "please",
+        "show", "state", "find", "calculate", "list", "name", "help", "solve", "detail",
+        "provide", "information", "info", "discuss", "view", "know", "check", "need",
         # Generic academic terms that appear in all disciplines
         "formula", "theorem", "theory", "law", "rule", "definition", "concept",
         "principle", "problem", "solution", "example", "method", "system", "type",
@@ -459,8 +461,8 @@ Respond ONLY with valid JSON:
         logger.warning("Error parsing scan json: %s", e)
         fits_context = False
 
-    # HARD ENFORCEMENT: If the question shares ZERO meaningful topic keywords with the notes OR has zero vector chunks, it CANNOT be answered from the notes!
-    if len(shared_tokens) == 0:
+    # HARD ENFORCEMENT: If the question shares ZERO meaningful topic keywords with the notes, it CANNOT be answered from the notes!
+    if len(q_tokens) > 0 and len(shared_tokens) == 0:
         fits_context = False
 
     # ── CASE A: QUESTION DOES NOT FIT IN FILE CONTEXT ─────────────────────────
@@ -518,19 +520,20 @@ Respond ONLY with valid JSON:
     domain = notes_domain
 
     # 3. Step 2: Generate Explanation strictly grounded in the attached materials
-    exp_prompt = f"""You are AI Study Companion. The student asked a question that has been verified to fit within the context of their attached study notes ({domain}).
+    exp_prompt = f"""You are AI Study Companion. The student asked a question about their attached study notes ({domain}).
 
 STUDENT QUESTION: {prompt}
 
 ATTACHED RESOURCES IN THIS CHAT (Exclusive Source of Truth):
 {combined_notes[:7000]}
 
-STRICT RULES:
-1. Exclusive Source of Truth: Answer SOLELY using the content and concepts in the attached resources above. Do NOT answer from external general knowledge.
-2. Everyday real-life picture / physical analogy FIRST.
-3. Clear concept summary in 2-3 plain sentences.
-4. Structured explanation with key points drawn directly from the attached resources.
-5. Technical terms in English with plain definitions found in the notes.
+STRICT GROUNDING RULES:
+1. Exclusive Source of Truth: Answer SOLELY using the content and concepts in the attached resources above.
+2. If the concept asked in the question is NOT present or taught in the attached resources above (e.g. asking for Pythagoras Theorem on Computer Science notes), you MUST set "is_outlier": true and "body": null. Do NOT answer from external general knowledge.
+3. Everyday real-life picture / physical analogy FIRST.
+4. Clear concept summary in 2-3 plain sentences.
+5. Structured explanation with key points drawn directly from the attached resources.
+6. Technical terms in English with plain definitions found in the notes.
 
 Respond with valid JSON:
 {{
@@ -552,7 +555,50 @@ Respond with valid JSON:
     except Exception:
         explanation_data = {}
 
-    # Guarantee required fields are present even in mock mode or fallback
+    # If the model itself reported this topic as an outlier or missing from the notes, reject strictly!
+    if explanation_data.get("is_outlier") is True or not explanation_data.get("body"):
+        notice = (
+            f"I cannot answer this question because it is outside the scope of your uploaded notes. "
+            f"Your uploaded notes are about '{notes_domain}', while your question is about '{q_domain}'. "
+            "EzLearn answers questions strictly based on your uploaded study materials. "
+            "Please ask a question related to your uploaded notes or attach resources covering this topic."
+        )
+        explanation_data = {
+            "topic": prompt,
+            "is_outlier": True,
+            "outlier_notice": notice,
+            "file_context": notes_domain,
+            "body": None,
+            "summary": None,
+            "real_life_picture": None,
+            "key_terms": [],
+        }
+        msg_id = str(uuid.uuid4())
+        msg = MessageRecord(
+            id=msg_id,
+            conversation_id=conv_id,
+            role="assistant",
+            user_prompt=prompt,
+            explanation_json=json.dumps(explanation_data),
+            simulation_json=None,
+            quiz_json=None,
+            citations_json=json.dumps([]),
+            ai_suggestions=None,
+        )
+        db.add(msg)
+        conv.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        return {
+            "message_id": msg_id,
+            "user_prompt": prompt,
+            "explanation": explanation_data,
+            "simulation": None,
+            "quiz": None,
+            "citations": [],
+            "is_outlier": True,
+        }
+
     explanation_data["is_outlier"] = False
     if "real_life_picture" not in explanation_data:
         explanation_data["real_life_picture"] = (

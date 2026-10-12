@@ -71,6 +71,9 @@ export default function App() {
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  // Backend Health & Auto Wake-up State: 'checking' | 'online' | 'offline' | 'waking'
+  const [backendStatus, setBackendStatus] = useState('checking') // 'checking' | 'online' | 'offline' | 'waking'
+  const [isWakingUp, setIsWakingUp] = useState(false)
 
   const messagesEndRef = useRef(null)
   const recognitionRef = useRef(null)
@@ -95,6 +98,71 @@ export default function App() {
       startNewConversation()
     }
   }, [currentUser])
+
+  // Backend Health Checker & Auto-Wakeup Loop
+  async function checkBackendHealth() {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      const res = await fetch(`${API_URL}/api/health`, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (res.ok) {
+        setBackendStatus('online')
+        setIsWakingUp(false)
+        return true
+      } else {
+        setBackendStatus('offline')
+        return false
+      }
+    } catch {
+      setBackendStatus('offline')
+      return false
+    }
+  }
+
+  async function triggerWakeUp() {
+    setIsWakingUp(true)
+    setBackendStatus('waking')
+    // Ping health endpoint to wake up Render container
+    try {
+      fetch(`${API_URL}/api/health`).catch(() => {})
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    let intervalId = null
+    let active = true
+
+    async function initialCheck() {
+      const isUp = await checkBackendHealth()
+      if (!isUp && active) {
+        // If down on first load, immediately trigger wake-up ping
+        triggerWakeUp()
+      }
+    }
+
+    initialCheck()
+
+    // Poll every 5s if offline/waking, or every 45s if online to keep alive
+    intervalId = setInterval(async () => {
+      const isUp = await checkBackendHealth()
+      if (!isUp && active) {
+        // keep waking ping alive until online
+        try {
+          fetch(`${API_URL}/api/health`).catch(() => {})
+        } catch {
+          // ignore
+        }
+      }
+    }, backendStatus === 'online' ? 45000 : 5000)
+
+    return () => {
+      active = false
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [backendStatus, API_URL])
 
   function getAuthHeaders(extraHeaders = {}) {
     const token = localStorage.getItem('asc_token')
@@ -400,6 +468,82 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Hovering Backend Health Indicator Circle */}
+            <div className="relative group">
+              <button
+                onClick={() => {
+                  if (backendStatus !== 'online') {
+                    triggerWakeUp()
+                  } else {
+                    checkBackendHealth()
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-[11px] font-bold transition-all shadow-2xs cursor-pointer ${
+                  backendStatus === 'online'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                    : backendStatus === 'waking' || backendStatus === 'checking'
+                    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                    : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:ring-2 hover:ring-rose-300'
+                }`}
+                title="Backend server status indicator (Click to test/wake up)"
+              >
+                {/* Glowing / Hovering animated circle */}
+                <span className="relative flex h-2.5 w-2.5">
+                  {backendStatus !== 'online' ? (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 dark:bg-amber-500 opacity-75"></span>
+                  ) : null}
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                    backendStatus === 'online'
+                      ? 'bg-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-700'
+                      : backendStatus === 'waking' || backendStatus === 'checking'
+                      ? 'bg-amber-500 animate-pulse'
+                      : 'bg-rose-500 ring-2 ring-rose-300 dark:ring-rose-700'
+                  }`}></span>
+                </span>
+                
+                <span className="hidden sm:inline">
+                  {backendStatus === 'online'
+                    ? 'Backend Live'
+                    : backendStatus === 'waking'
+                    ? 'Waking Server…'
+                    : backendStatus === 'checking'
+                    ? 'Checking…'
+                    : 'Backend Asleep'}
+                </span>
+              </button>
+
+              {/* Hovering Popover Card */}
+              <div className="absolute right-0 top-full mt-2 w-64 p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 text-left pointer-events-none group-hover:pointer-events-auto">
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100 dark:border-gray-800 mb-2">
+                  <span className="text-xs font-black text-gray-800 dark:text-gray-100 flex items-center gap-1.5">
+                    <span>⚡</span> Backend Status
+                  </span>
+                  <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                    backendStatus === 'online'
+                      ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200'
+                      : 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200'
+                  }`}>
+                    {backendStatus}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed mb-2.5">
+                  {backendStatus === 'online'
+                    ? 'FastAPI server on Render is online, healthy, and handling requests.'
+                    : 'Free cloud hosting spins down after inactivity. Click below to immediately wake it up.'}
+                </p>
+
+                {backendStatus !== 'online' && (
+                  <button
+                    onClick={triggerWakeUp}
+                    className="w-full py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5"
+                  >
+                    <span>🚀</span> Turn On Backend Now
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Dark / Light Mode Button */}
             <button
               onClick={() => setDarkMode(!darkMode)}
@@ -438,6 +582,30 @@ export default function App() {
             )}
           </div>
         </header>
+
+        {/* Floating Auto-Wakeup Notice Banner if Backend is Asleep or Waking */}
+        {backendStatus !== 'online' && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-indigo-500/10 dark:from-amber-950/40 dark:to-indigo-950/30 border-b border-amber-200/80 dark:border-amber-800/60 px-4 py-2 flex items-center justify-between gap-3 text-xs shrink-0 animate-fadeIn">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <span className="text-amber-800 dark:text-amber-200 font-medium truncate">
+                {backendStatus === 'waking'
+                  ? 'Render backend server is waking up from idle mode (takes ~30-45s on free plan)…'
+                  : 'Backend server is in sleep mode. Auto-waking now…'}
+              </span>
+            </div>
+            <button
+              onClick={triggerWakeUp}
+              disabled={isWakingUp}
+              className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-bold text-[11px] shadow-2xs whitespace-nowrap shrink-0 transition-all"
+            >
+              {isWakingUp ? 'Waking…' : 'Wake Now ⚡'}
+            </button>
+          </div>
+        )}
 
         {/* Dynamic Attached Resources Banner */}
         {hasAttachedResources && (

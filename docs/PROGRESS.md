@@ -1,10 +1,23 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Voice Speech-to-Text (Mic Input) Added for Chat Questions ✅
+Last updated: 2026-10-12 — Hovering Backend Status Indicator & Auto-Wakeup Added ✅
 
 ---
 
 ## ✅ Done
+
+### Hovering Backend Status Indicator & Auto-Wakeup (EzLearn)
+- **Hovering Status Circle Indicator**:
+  - Added an interactive indicator circle directly in the top navbar in `frontend/src/App.jsx`.
+  - Shows real-time backend state:
+    - 🟢 **Live** (emerald ring) when FastAPI server on Render is responsive.
+    - 🟡 **Waking / Checking** (amber pulsing/pinging circle) while waking from sleep.
+    - 🔴 **Asleep / Offline** (rose ring) when inactive.
+  - Hovering reveals a detail card explaining the state with a one-click **"Turn On Backend Now"** action.
+- **Automatic Health Check & Wake-up**:
+  - Automatically queries `/api/health` upon page load.
+  - If the server has spun down into idle sleep (standard Render free-tier behavior), the frontend automatically sends wake-up pings and polls every 5s until the server is fully awake.
+  - Displays a gentle floating notification banner explaining the wake-up progress so students know the server is booting up.
 
 ### Voice Input (Speech-to-Text Dictation)
 - **Microphone Button**: Integrated voice input toggle directly inside the chat bar next to the send button in `frontend/src/App.jsx`.

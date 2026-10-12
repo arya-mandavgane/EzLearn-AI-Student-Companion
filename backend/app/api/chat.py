@@ -480,11 +480,10 @@ Respond with valid JSON:
 
     # ── CASE B: QUESTION FITS FILE CONTEXT ─────────────────────────────────────
     # Synthesize across attached resources in this conversation.
-    # Web knowledge may ONLY be used based on that established context.
+    # Answers must be based purely on the attached study materials without external web knowledge.
     domain = file_context_info.get("domain") or "the uploaded study materials"
-    used_external_web = len(relevant_chunks) == 0
 
-    # 3. Step 2: Generate Explanation grounded in file context
+    # 3. Step 2: Generate Explanation strictly grounded in the attached materials
     exp_prompt = f"""You are AI Study Companion. The student asked a question that fits within the verified context of their attached study file(s).
 
 ESTABLISHED FILE CONTEXT:
@@ -494,17 +493,15 @@ Core Topics: {', '.join(file_context_info.get('core_topics', []))}
 
 STUDENT QUESTION: {prompt}
 
-ATTACHED RESOURCES IN THIS CHAT (Primary Source):
-{combined_notes[:6500]}
+ATTACHED RESOURCES IN THIS CHAT (Source of Truth):
+{combined_notes[:7000]}
 
 STRICT RULES:
-1. Primary Source: Ground your explanation primarily in the attached study resources.
-2. Web Knowledge Rule: If web knowledge is needed ({used_external_web}), use web knowledge BASED ONLY ON THE ESTABLISHED FILE CONTEXT ('{domain}'). Never wander into topics outside this context.
-3. Everyday real-life picture / physical analogy FIRST.
-4. Clear concept summary in 2-3 plain sentences.
-5. Structured explanation with key points drawn from the attached resources and in-context knowledge.
-6. Technical terms in English with plain definitions.
-7. Any external web sources provided must be reliable references strictly relevant to '{domain}'.
+1. Purely Grounded: Base your explanation entirely and strictly on the content of the attached study resources. Do NOT use external web knowledge or search.
+2. Everyday real-life picture / physical analogy FIRST.
+3. Clear concept summary in 2-3 plain sentences.
+4. Structured explanation with key points drawn directly from the attached resources.
+5. Technical terms in English with plain definitions found in or relevant to the notes.
 
 Respond with valid JSON:
 {{
@@ -513,10 +510,8 @@ Respond with valid JSON:
   "topic_type": "analogy" | "comparison_table" | "worked_example" | "simulation",
   "real_life_picture": "Everyday physical picture",
   "summary": "Plain 2-3 sentence summary",
-  "body": "Detailed explanation synthesized from the attached resources within this file context",
-  "key_terms": [{{"term": "Term", "meaning": "Meaning"}}],
-  "external_sources_used": {str(used_external_web).lower()},
-  "web_sources": [{{"title": "Source Name", "url": "https://..."}}]
+  "body": "Detailed explanation synthesized purely from the attached study resources",
+  "key_terms": [{{"term": "Term", "meaning": "Meaning"}}]
 }}
 """
     raw_exp = generate(exp_prompt)
@@ -551,12 +546,10 @@ Respond with valid JSON:
         explanation_data["topic_type"] = "analogy"
     if "key_terms" not in explanation_data:
         explanation_data["key_terms"] = []
-    if "external_sources_used" not in explanation_data:
-        explanation_data["external_sources_used"] = used_external_web
 
     # 4. Step 3: Demonstration / Simulation Plan (Single unified view showing all parts)
     topic_name = explanation_data.get("topic") or prompt
-    sim_prompt = f"""Design a visual single-phase process diagram / interactive demonstration for: '{topic_name}'.
+    sim_prompt = f"""Design a visual single-phase process diagram / interactive demonstration for: '{topic_name}' within the academic context of '{domain}'.
 Instead of multi-phase step navigation or paging, design a comprehensive single-phase view showing all its interconnected parts/components clearly.
 Return valid JSON:
 {{
@@ -623,7 +616,6 @@ Return valid JSON:
         "simulation": simulation_data,
         "quiz": quiz_payload,
         "citations": citations,
-        "used_external_web": used_external_web,
     }
 
 

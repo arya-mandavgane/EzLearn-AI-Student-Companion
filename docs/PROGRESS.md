@@ -1,21 +1,26 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — File Context Scanning & In-Context-Only Web Knowledge Gating Completed ✅
+Last updated: 2026-10-12 — External Web Knowledge Feature Removed (100% Pure File Grounding) ✅
 
 ---
 
 ## ✅ Done
 
-### File Context Scanning & In-Context Web Knowledge Gating (EzLearn)
+### Complete Removal of External Web Knowledge Feature (EzLearn)
+- **100% Pure File Grounding**:
+  - Removed all external web knowledge fallback, web searches, external source fetching, and web reference links.
+  - Explanations, analogies, technical terms, simulations, and quizzes are generated purely and strictly from the student's attached study materials and scanned file context.
+- **Clean UI Presentation**:
+  - Removed the `🌐 External Web Sources Consulted` list and clickable external links from `frontend/src/App.jsx`.
+  - Removed the `🌐 Enriched with In-Context Web Knowledge` tag from message headers.
+  - Explanations only display verified resource citations from the user's uploaded materials (e.g. `📄 Page X`).
+
+### File Context Scanning & Gating (EzLearn)
 - **Automatic File Context Scanning**:
-  - Whenever a question is submitted, the backend scans all attached resources/files in the current chat to identify their exact academic context, subject domain, core themes, and scope (e.g. `Computer Science / Data Structures - Stacks and Queues`).
+  - Scans all attached resources/files in the current chat to identify their exact academic context, subject domain, and scope.
 - **Strict Context-Fit Validation**:
-  - The student's question is evaluated against the scanned context of the file.
-  - If the question does NOT fit in the context of the file, it is strictly refused and **not answered**.
-  - Displays a clear notice to the student: *"I cannot answer this question because it does not fit within the context of your uploaded file(s). Your uploaded material covers: '{domain}'."*
+  - Questions that do not fit in the context of the file are strictly rejected and not answered.
   - No explanation body, no simulation, and no quiz are generated for out-of-context queries.
-- **Web Knowledge Strictly Scoped to File Context**:
-  - Web knowledge and external references are permitted **only if the question fits the file's context**, and are strictly constrained to that specific domain (never introducing or answering unrelated topics).
 
 ### Strict Per-Chat Resource Isolation (EzLearn)
 - **Strictly Scoped to Active Chat**:

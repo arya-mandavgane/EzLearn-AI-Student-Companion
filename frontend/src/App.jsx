@@ -754,10 +754,6 @@ export default function App() {
                         <span className="text-[10px] bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
                           <span>🚫</span> Not Answered (Out of Context)
                         </span>
-                      ) : msg.explanation.external_sources_used ? (
-                        <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-full font-bold">
-                          🌐 Enriched with In-Context Web Knowledge
-                        </span>
                       ) : null}
                     </div>
 
@@ -827,30 +823,6 @@ export default function App() {
                             📄 Page {c.page}
                           </span>
                         ))}
-                      </div>
-                    )}
-
-                    {/* External Web Sources */}
-                    {msg.explanation.web_sources?.length > 0 && (
-                      <div className="pt-2 border-t dark:border-gray-800 space-y-1.5 text-[11px]">
-                        <span className="font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">
-                          🌐 External Web Sources Consulted:
-                        </span>
-                        <div className="flex flex-wrap gap-2">
-                          {msg.explanation.web_sources.map((ws, wIdx) => (
-                            <a
-                              key={wIdx}
-                              href={ws.url || `https://www.google.com/search?q=${encodeURIComponent(ws.title || msg.explanation.topic)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-semibold transition-colors"
-                            >
-                              <span>🔗</span>
-                              <span className="underline decoration-indigo-300 underline-offset-2">{ws.title || 'Web Reference'}</span>
-                              <span className="text-[10px] text-indigo-400">↗</span>
-                            </a>
-                          ))}
-                        </div>
                       </div>
                     )}
                   </div>

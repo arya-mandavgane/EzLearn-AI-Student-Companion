@@ -1,10 +1,25 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — External Web Knowledge Feature Removed (100% Pure File Grounding) ✅
+Last updated: 2026-10-12 — Strict Multi-Layer Domain Alignment & Lexical Gating Implemented (Fixed Off-Topic Leak) ✅
 
 ---
 
 ## ✅ Done
+
+### Strict Multi-Layer Domain Alignment & Lexical Gating (EzLearn)
+- **Root Cause Resolution**:
+  - Previously, the single-prompt `fits_context` check defaulted to `True` or parsed string `"false"` as a truthy value (`bool("false") == True`), which allowed unrelated questions (such as Geography questions on Computer Science notes) to pass through to general Gemini generation.
+- **Multi-Layer Hard Gating**:
+  1. **Two-Domain Comparison Verification**:
+     - The AI verifier explicitly extracts `notes_subject` (e.g. `Computer Science - Data Structures`) and `question_subject` (e.g. `Geography`).
+     - Strictly requires `same_domain: true` and `fits_context: true`. If the subjects belong to different domains, it is unconditionally classified as out of context.
+  2. **Deterministic Token & Semantic Overlap Check**:
+     - Extracts content tokens from the query and notes (excluding stopwords).
+     - If the student query has **zero shared content tokens** with the uploaded materials AND **zero vector store chunks**, it is hard-rejected as an out-of-context topic.
+  3. **Safe Boolean Parsing**:
+     - Implemented `_parse_bool` to safely handle string booleans (`"false"`, `"0"`, `"no"`) and default to `False`.
+  4. **Strict Grounding in Generation**:
+     - Even for in-domain queries, prompts explicitly instruct the AI that the uploaded notes are the exclusive source of truth, prohibiting general world knowledge answers.
 
 ### Complete Removal of External Web Knowledge Feature (EzLearn)
 - **100% Pure File Grounding**:

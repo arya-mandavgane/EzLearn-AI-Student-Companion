@@ -378,76 +378,110 @@ def send_chat_message(
         {"page": c.page, "snippet": c.snippet, "chunk_id": c.chunk_id} for c in relevant_chunks
     ]
 
-    # ── STEP 1: SCAN THE FILE(S) & IDENTIFY THEIR ACADEMIC CONTEXT ───────────────
-    # First, scan the attached file(s) to determine their subject, domain, core themes, and scope.
-    # Second, check whether the student's question fits into that context.
-    context_scan_prompt = f"""You are an educational curriculum and document analyzer.
+    # ── STEP 1: DETERMINISTIC LEXICAL & SEMANTIC OVERLAP CHECK ─────────────────
+    import re
+    _stopwords = {
+        "what", "when", "where", "which", "who", "whom", "whose", "why", "how",
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "can", "could", "should", "would",
+        "may", "might", "must", "shall", "will", "and", "or", "but", "if", "because",
+        "as", "until", "while", "of", "at", "by", "for", "with", "about", "against",
+        "between", "into", "through", "during", "before", "after", "above", "below",
+        "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again",
+        "further", "then", "once", "here", "there", "all", "any", "both", "each",
+        "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only",
+        "own", "same", "so", "than", "too", "very", "explain", "tell", "describe",
+        "give", "write", "define", "summary", "notes", "question", "answer", "please"
+    }
 
-First, thoroughly scan the attached study resources/files and identify their exact academic context, subject domain, core topics, and boundaries.
-Second, determine whether the student's question fits within this established context.
+    q_tokens = {w for w in re.findall(r"\b[a-zA-Z]{3,}\b", prompt.lower()) if w not in _stopwords}
+    notes_tokens = {w for w in re.findall(r"\b[a-zA-Z]{3,}\b", combined_notes.lower()) if w not in _stopwords}
+    shared_tokens = q_tokens.intersection(notes_tokens)
 
-STUDENT QUESTION: {prompt}
+    # ── STEP 2: SCAN FILE CONTEXT & VERIFY SUBJECT DOMAIN VIA AI ───────────────
+    context_scan_prompt = f"""You are a strict academic verifier.
+A student uploaded study notes on a specific subject and asked a question.
+Your job is to identify the subject domain of the notes, the subject domain of the question, and determine if they match.
 
-ATTACHED STUDY RESOURCES (Files, notes, documents in this chat):
+STUDENT QUESTION:
+{prompt}
+
+ATTACHED STUDY RESOURCES (Study notes uploaded in this chat):
 {combined_notes[:7000]}
 
 Rules:
-1. Define the exact academic context of the uploaded file(s) (e.g. "Computer Science / Data Structures - Stacks and Queues", "Chemistry - Chemical Bonding", "Indian History - Freedom Struggle").
-2. Context-fit check:
-   - "fits_context": true ONLY if the student's question is directly related to, belongs within, or logically fits the academic context/domain of the uploaded file(s).
-   - "fits_context": false if the question does NOT fit in the context of the file(s) (e.g. asking about unrelated topics, different subjects, general trivia, or off-topic queries).
-3. If fits_context is false, state clearly why it is outside the context of the file(s).
+1. Identify "notes_subject": What academic subject are the uploaded notes about? (e.g. "Computer Science - Data Structures", "Operating Systems", "Organic Chemistry", "Macroeconomics").
+2. Identify "question_subject": What academic subject is the student's question about? (e.g. "Geography", "European History", "Computer Science", "Cooking", "World Geography").
+3. "same_domain": Are the notes subject and question subject within the exact same academic curriculum/field? (true or false). If notes are Computer Science and question is Geography, this MUST be false!
+4. "fits_context": Does the student's question belong within the specific syllabus and topics of the uploaded notes? (true or false).
 
-Respond with valid JSON:
+Respond ONLY with valid JSON:
 {{
-  "file_context": {{
-    "domain": "Academic domain of the file (e.g., Computer Science - Data Structures)",
-    "core_topics": ["Topic 1", "Topic 2", "Topic 3"],
-    "summary": "1-sentence summary of the context of the uploaded file(s)"
-  }},
-  "fits_context": true | false,
-  "confidence": 0.0 to 1.0,
-  "reason": "Why the question fits or does not fit the context of the file(s)"
+  "notes_subject": "Academic subject of the notes",
+  "question_subject": "Academic subject of the question",
+  "same_domain": false,
+  "fits_context": false,
+  "reason": "Clear explanation of why it fits or does NOT fit the notes context"
 }}
 """
     raw_scan = generate(context_scan_prompt)
-    fits_context = True
-    file_context_info = {}
+
+    def _parse_bool(val, default=False) -> bool:
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            v = val.strip().lower()
+            if v in ("true", "1", "yes"):
+                return True
+            if v in ("false", "0", "no"):
+                return False
+        return default
+
+    fits_context = False
+    notes_domain = "Uploaded study notes"
+    q_domain = "Asked topic"
+
     try:
         from app.api.explain import _parse_ai_json
         scan_data = _parse_ai_json(raw_scan, expected_type=dict)
         if isinstance(scan_data, dict):
-            fits_context = bool(scan_data.get("fits_context", True))
-            file_context_info = scan_data.get("file_context") or {}
-    except Exception:
-        # Fallback heuristic: check if any relevant chunks match above threshold
-        fits_context = len(relevant_chunks) > 0
+            notes_domain = scan_data.get("notes_subject") or notes_domain
+            q_domain = scan_data.get("question_subject") or q_domain
+            ai_same_domain = _parse_bool(scan_data.get("same_domain"), default=False)
+            ai_fits_context = _parse_bool(scan_data.get("fits_context"), default=False)
+
+            if ai_same_domain and ai_fits_context:
+                fits_context = True
+            elif ai_fits_context and (len(shared_tokens) > 0 or len(relevant_chunks) > 0):
+                fits_context = True
+    except Exception as e:
+        logger.warning("Error parsing scan json: %s", e)
+        fits_context = len(relevant_chunks) > 0 and len(shared_tokens) > 0
+
+    # HARD ENFORCEMENT: If the question shares ZERO meaningful keywords with the notes AND has ZERO relevant chunks, it is 100% an out-of-context outlier topic!
+    if len(shared_tokens) == 0 and len(relevant_chunks) == 0:
+        fits_context = False
 
     # ── CASE A: QUESTION DOES NOT FIT IN FILE CONTEXT ─────────────────────────
     # Questions that do not fit in the context of the file MUST NOT be answered.
     # Refuse strictly: no explanation body, no simulation, no quiz.
     if not fits_context:
-        domain = file_context_info.get("domain") or "the uploaded study materials"
-        scope = file_context_info.get("summary") or ""
-
         notice = (
-            f"I cannot answer this question because it does not fit within the context of your uploaded file(s). "
-            f"Your uploaded material covers: '{domain}'. "
-            "EzLearn answers questions strictly within the context of your attached study resources. "
-            "Please ask a question related to this context or upload new materials covering your topic."
+            f"I cannot answer this question because it is outside the scope of your uploaded notes. "
+            f"Your uploaded notes are about '{notes_domain}', while your question is about '{q_domain}'. "
+            "EzLearn answers questions strictly based on your uploaded study materials. "
+            "Please ask a question related to your uploaded notes or attach resources covering this topic."
         )
 
         explanation_data = {
             "topic": prompt,
             "is_outlier": True,
             "outlier_notice": notice,
-            "file_context": domain,
+            "file_context": notes_domain,
             "body": None,
             "summary": None,
             "real_life_picture": None,
             "key_terms": [],
-            "external_sources_used": False,
-            "web_sources": [],
         }
 
         # Save record with NO simulation and NO quiz
@@ -474,34 +508,28 @@ Respond with valid JSON:
             "simulation": None,
             "quiz": None,
             "citations": [],
-            "used_external_web": False,
             "is_outlier": True,
         }
 
     # ── CASE B: QUESTION FITS FILE CONTEXT ─────────────────────────────────────
     # Synthesize across attached resources in this conversation.
     # Answers must be based purely on the attached study materials without external web knowledge.
-    domain = file_context_info.get("domain") or "the uploaded study materials"
+    domain = notes_domain
 
     # 3. Step 2: Generate Explanation strictly grounded in the attached materials
-    exp_prompt = f"""You are AI Study Companion. The student asked a question that fits within the verified context of their attached study file(s).
-
-ESTABLISHED FILE CONTEXT:
-Domain: {domain}
-Summary: {file_context_info.get('summary', 'Uploaded study material')}
-Core Topics: {', '.join(file_context_info.get('core_topics', []))}
+    exp_prompt = f"""You are AI Study Companion. The student asked a question that has been verified to fit within the context of their attached study notes ({domain}).
 
 STUDENT QUESTION: {prompt}
 
-ATTACHED RESOURCES IN THIS CHAT (Source of Truth):
+ATTACHED RESOURCES IN THIS CHAT (Exclusive Source of Truth):
 {combined_notes[:7000]}
 
 STRICT RULES:
-1. Purely Grounded: Base your explanation entirely and strictly on the content of the attached study resources. Do NOT use external web knowledge or search.
+1. Exclusive Source of Truth: Answer SOLELY using the content and concepts in the attached resources above. Do NOT answer from external general knowledge.
 2. Everyday real-life picture / physical analogy FIRST.
 3. Clear concept summary in 2-3 plain sentences.
 4. Structured explanation with key points drawn directly from the attached resources.
-5. Technical terms in English with plain definitions found in or relevant to the notes.
+5. Technical terms in English with plain definitions found in the notes.
 
 Respond with valid JSON:
 {{

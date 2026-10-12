@@ -888,12 +888,6 @@ export default function App() {
             </button>
           </form>
 
-          {!hasAttachedResources && (
-            <p className="text-center text-[11px] text-indigo-600 dark:text-indigo-400 font-medium mt-1.5 flex items-center justify-center gap-1">
-              <span>💡 Tip:</span> Type your question or click <strong>+</strong> to attach PDFs, photos, audio, or notes.
-            </p>
-          )}
-
           {/* ── Footer Credits ── */}
           <footer className="text-center text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium pt-2 pb-0.5 select-none px-2 flex items-center justify-center gap-1.5 flex-wrap">
             <span>Created by</span>

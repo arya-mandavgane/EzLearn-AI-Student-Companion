@@ -85,6 +85,7 @@ export default function App() {
   // Backend Health & Auto Wake-up State: 'checking' | 'online' | 'offline' | 'waking'
   const [backendStatus, setBackendStatus] = useState('checking') // 'checking' | 'online' | 'offline' | 'waking'
   const [isWakingUp, setIsWakingUp] = useState(false)
+  const [backendInfo, setBackendInfo] = useState(null)
 
   const messagesEndRef = useRef(null)
   const recognitionRef = useRef(null)
@@ -118,7 +119,9 @@ export default function App() {
       const res = await fetch(`${API_URL}/api/health`, { signal: controller.signal })
       clearTimeout(timeoutId)
       if (res.ok) {
+        const data = await res.json()
         setBackendStatus('online')
+        setBackendInfo(data)
         setIsWakingUp(false)
         return true
       } else {
@@ -584,6 +587,23 @@ export default function App() {
                     ? 'FastAPI server on Render is online, healthy, and handling requests.'
                     : 'Free cloud hosting spins down after inactivity. Click below to immediately wake it up.'}
                 </p>
+
+                {backendStatus === 'online' && (
+                  <div className="mb-2 p-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-[10px] space-y-1">
+                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
+                      <span>Server Build:</span>
+                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                        {backendInfo?.build_version || 'pre-v2.1 (Needs Redeploy)'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
+                      <span>Grounding Guard:</span>
+                      <span className={`font-semibold ${backendInfo?.grounding ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600'}`}>
+                        {backendInfo?.grounding ? 'Strict Dual-Schema' : 'Not Deployed'}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {backendStatus !== 'online' && (
                   <button

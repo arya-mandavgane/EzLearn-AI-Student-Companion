@@ -1,21 +1,22 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Dual-Schema Extractive Grounding & Conversational Modifier Gating Implemented ✅
+Last updated: 2026-10-12 — Active Build Telemetry & Dual-Schema Grounding Live Check Added ✅
 
 ---
 
 ## ✅ Done
 
-### Dual-Schema Extractive Grounding & Conversational Modifier Gating (EzLearn)
-- **Eliminated Conversational Modifier Word Collisions**:
-  - Filtered conversational and qualitative adjectives ("simple", "terms", "words", "understand", "short", "long", "easy", "basic", "main", "first", "second", "best", "different", "used", "use", "using", "make", "like", "good", "right", "way", "point", "well", "also") from keyword overlap matching so questions like "explain in simple terms the pythagoras theorem formula" cannot falsely match common English words in uploaded notes.
-- **Dual-Schema Strict Extractive Prompt**:
-  - Rewrote the explanation prompt (`exp_prompt`) with an explicit dual-schema directive:
-    - If the requested concept is NOT in the uploaded notes: AI is forced to return `is_outlier: true`, `body: null`, `summary: null`, `real_life_picture: null`.
-    - If the requested concept IS in the uploaded notes: AI synthesizes explanation strictly from the notes.
-  - Verified live with Google Gemini API: `"What is a stack and what operations does it support?"` returns `is_outlier: False | has_body: True`, while `"pythagoras theorem formula"` returns `is_outlier: True | has_body: False`.
-- **Absolute Quiz & Simulation Prevention on Outliers**:
-  - Whenever `is_outlier` is true (or `body` is null), execution strictly branches to Case A: saves outlier notice, sets `simulation: None` and `quiz: None`, preventing quiz generation on unrelated topics entirely.
+### Active Build Telemetry & Live Version Indicator (EzLearn)
+- **Live Build Verification Probe (`/api/health`)**:
+  - Added `build_version: "v2.1-grounded-strict"` and `grounding: "dual_schema_outlier_gated"` to the `/api/health` probe so clients can identify in real time whether the active cloud container is running the latest deployment or an outdated container.
+- **Frontend Live Build Telemetry**:
+  - `frontend/src/App.jsx` now captures `/api/health` metadata and surfaces it on the hovering **Backend Live** badge:
+    - Shows exact active server build (`v2.1-grounded-strict`).
+    - Explicitly flags `pre-v2.1 (Needs Redeploy)` if an outdated cloud container is serving requests.
+- **Dual-Schema Extractive Grounding & Conversational Modifier Gating**:
+  - Filtered conversational and qualitative adjectives ("simple", "terms", "words", "understand", "short", "long", "easy", "basic", "main", "first", "second", "best", "different", "used", "use", "using", "make", "like", "good", "right", "way", "point", "well", "also") from keyword overlap matching.
+  - Rewrote the explanation prompt (`exp_prompt`) with an explicit dual-schema directive, preventing unmentioned topics from ever receiving explanations, simulations, or quizzes.
+
 
 
 ### Strict Multi-Layer Domain Alignment & Lexical Gating (EzLearn)

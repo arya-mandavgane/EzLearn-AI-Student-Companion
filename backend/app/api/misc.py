@@ -12,11 +12,13 @@ router = APIRouter(tags=["misc"])
 
 @router.get("/health")
 def health_check():
-    """Liveness probe. Reports whether AI is in mock mode."""
+    """Liveness probe. Reports whether AI is in mock mode and current active build version."""
     return {
         "status": "ok",
         "mock_mode": settings.ai_mock or settings.ai_provider == "mock",
         "ai_provider": settings.ai_provider,
+        "build_version": "v2.1-grounded-strict",
+        "grounding": "dual_schema_outlier_gated",
     }
 
 

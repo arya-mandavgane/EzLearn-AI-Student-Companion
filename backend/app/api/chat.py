@@ -9,7 +9,7 @@ Complete Chatbot Backend Pipeline:
   1. What you asked
   2. Explanation (multi-format with everyday analogy)
   3. Demonstration / simulation plan
-  4. 10-Question Quiz (single attempt lock)
+  4. 5-Question Quiz (single attempt lock)
   5. AI-based performance suggestions upon quiz completion
 - Daily / Weekly / Monthly performance reports (accuracy, weaknesses, strengths, must-do topics)
 """
@@ -728,7 +728,7 @@ def submit_chat_quiz(
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
-    Score the 10-question quiz for this turn.
+    Score the 5-question quiz for this turn.
     Locks the attempt (attempt once; subsequent calls return results).
     Generates AI suggestions regarding topic accuracy, strengths, and must-do topics.
     """

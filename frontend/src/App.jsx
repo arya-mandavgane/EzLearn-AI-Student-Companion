@@ -17,7 +17,7 @@
  *     1. What you asked
  *     2. Explanation (everyday analogy, key terms, summary)
  *     3. Demonstration / simulation
- *     4. 10-Question Quiz (single attempt lock)
+ *     4. 5-Question Quiz (single attempt lock)
  *     5. AI suggestions regarding strengths, weaknesses, must-do topics
  */
 
@@ -853,7 +853,7 @@ export default function App() {
                   <ProcessSimulationView plan={msg.simulation} />
                 )}
 
-                {/* 4. 10-Question Quiz (Attempt once / locked results) */}
+                {/* 4. 5-Question Quiz (Attempt once / locked results) */}
                 {msg.quiz && (
                   <TenQuestionQuiz
                     quizData={msg.quiz}
@@ -896,7 +896,7 @@ export default function App() {
                 <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-full" />
                 <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-4/5" />
                 <p className="text-[11px] text-gray-400 dark:text-gray-500 pt-2 font-medium">
-                  ✨ Synthesizing explanation, visual demonstration, and 10-question quiz…
+                  ✨ Synthesizing explanation, visual demonstration, and 5-question quiz…
                 </p>
               </div>
             </div>

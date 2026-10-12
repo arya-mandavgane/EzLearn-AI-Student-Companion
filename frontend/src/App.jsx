@@ -47,14 +47,24 @@ export default function App() {
     return localStorage.getItem('asc_theme') === 'dark' || false
   })
 
-  // Auth state
-  const [isAuthOpen, setIsAuthOpen] = useState(false)
+  // Auth state: Check if previous login data exists
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const stored = localStorage.getItem('asc_user')
       return stored ? JSON.parse(stored) : null
     } catch {
       return null
+    }
+  })
+
+  // Open login/register modal automatically on initial load if user is not logged in
+  const [isAuthOpen, setIsAuthOpen] = useState(() => {
+    try {
+      const storedUser = localStorage.getItem('asc_user')
+      const storedToken = localStorage.getItem('asc_token')
+      return !(storedUser && storedToken)
+    } catch {
+      return true
     }
   })
 

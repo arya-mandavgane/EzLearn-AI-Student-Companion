@@ -1,10 +1,17 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — AI Pedagogical Suggestions on Quiz Attempt Completed & Verified ✅
+Last updated: 2026-10-12 — Initial Load Welcome Back (Login/Register) Modal Added ✅
 
 ---
 
 ## ✅ Done
+
+### Initial Load Authentication Check (EzLearn)
+- **Automatic Login / Register Prompt**:
+  - When the web application is loaded, it checks `localStorage` for existing authenticated session tokens (`asc_user` & `asc_token`).
+  - If a valid session is already present, the user enters directly with their saved credentials and full chat history intact without interruption.
+  - If no login credentials exist, the "Welcome Back!" Login/Register modal opens automatically, welcoming the user and allowing them to sign in or create an account.
+  - Users can still dismiss the modal to explore in guest mode if desired.
 
 ### Post-Quiz AI Pedagogical Suggestions (EzLearn)
 - **Automatic AI Suggestions on Quiz Attempt**:

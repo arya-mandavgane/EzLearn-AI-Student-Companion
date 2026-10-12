@@ -1,15 +1,27 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Resource Gating, Question Display during Generation, Strict Outlier Rejection & Single-Phase Process Simulation Completed ✅
+Last updated: 2026-10-12 — Strict Per-Chat Resource Isolation Enforced (No Resource Leaks From Previous Chats) ✅
 
 ---
 
 ## ✅ Done
 
+### Strict Per-Chat Resource Isolation (EzLearn)
+- **Strictly Scoped to Active Chat**:
+  - Resources from previous chats or other conversations NEVER grant typing privileges in the current chat.
+  - If the currently active chat does not have attached resources (`currentConvData.resources.length === 0`), question typing is strictly disabled.
+  - The text box, voice recognition (microphone), and send button remain disabled, displaying: `⚠️ Current chat has no resources. Attach notes using "+" to type questions…`.
+- **Immediate State Clearing on Chat Switch & Creation**:
+  - `startNewConversation()` and `loadConversation(id)` immediately clear active conversation state (`currentConvData = null` / `resources: []`) to prevent stale resources from earlier chats leaking into a new session while network requests are in flight.
+  - Evaluated `hasAttachedResources` against `activeConvId === currentConvData.id` to guarantee validation against the current chat exclusively.
+- **Backend RAG & Validation Isolation**:
+  - Backend `/api/chat/conversations/{conv_id}/messages` enforces that resources exist in `conv_id` specifically.
+  - Vector search chunks are filtered strictly by `conv_id` prefix, ensuring knowledge from other conversations cannot bleed across chat sessions.
+
 ### Resource Gating, Outlier Rejection & Single-Phase Process Simulation (EzLearn)
 1. **Resource Enforcement Before Question Typing**:
    - The user cannot type or submit questions in a chat without attaching at least one study resource (text note, image, PDF, or audio).
-   - The question input and speech-to-text button remain disabled with a helpful placeholder: `⚠️ Attach resources first using "+" to enable question typing…`.
+   - The question input and speech-to-text button remain disabled with a helpful placeholder.
    - Backend `/api/chat/conversations/{conv_id}/messages` rejects prompts with HTTP 400 if no resources are attached to that chat.
 
 2. **Display User Question Above Generating Indicator**:

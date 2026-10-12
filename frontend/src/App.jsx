@@ -208,8 +208,12 @@ export default function App() {
   async function loadConversation(id) {
     if (!id) return
     setActiveConvId(id)
-    setLoadingConv(true)
+    setPromptInput('')
+    setPendingQuestion('')
     setErrorNotice('')
+    // Clear out previous chat data immediately so resources from other chats never leak into current view
+    setCurrentConvData(null)
+    setLoadingConv(true)
     try {
       const res = await fetch(`${API_URL}/api/chat/conversations/${id}`, {
         headers: getAuthHeaders(),
@@ -228,6 +232,13 @@ export default function App() {
   }
 
   async function startNewConversation() {
+    setPromptInput('')
+    setPendingQuestion('')
+    setErrorNotice('')
+    // Immediately clear current conversation so no resources carry over from previous chat
+    setActiveConvId(null)
+    setCurrentConvData(null)
+    setLoadingConv(true)
     try {
       const res = await fetch(`${API_URL}/api/chat/conversations`, {
         method: 'POST',
@@ -235,18 +246,31 @@ export default function App() {
         body: JSON.stringify({ title: 'New Study Session' }),
       })
       const data = await res.json()
-      if (currentUser) {
-        setConversations(prev => [
-          { id: data.id, title: data.title, resource_count: 0, message_count: 0, updated_at: data.created_at },
-          ...prev,
-        ])
+      if (res.ok && data?.id) {
+        const freshConv = {
+          id: data.id,
+          title: data.title || 'New Study Session',
+          resources: [],
+          messages: [],
+        }
+        setActiveConvId(data.id)
+        setCurrentConvData(freshConv)
+        if (currentUser) {
+          setConversations(prev => [
+            { id: data.id, title: data.title, resource_count: 0, message_count: 0, updated_at: data.created_at },
+            ...prev.filter(c => c.id !== data.id),
+          ])
+        } else {
+          // Guest users: volatile current chat only, no history list
+          setConversations([])
+        }
       } else {
-        // Guest users: volatile current chat only, no history list
-        setConversations([])
+        setErrorNotice('Failed to start a new chat.')
       }
-      loadConversation(data.id)
     } catch {
       setErrorNotice('Failed to start a new chat.')
+    } finally {
+      setLoadingConv(false)
     }
   }
 
@@ -355,6 +379,12 @@ export default function App() {
   }, [])
 
   function handleToggleSpeechRecognition() {
+    if (!hasAttachedResources) {
+      setErrorNotice('⚠️ This chat has no attached resources. Please attach study notes, images, PDFs, or audio first using the "+" button before using voice input.')
+      setIsResourceModalOpen(true)
+      return
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
       setErrorNotice('Voice recognition is not supported in this browser. Please try Google Chrome or Edge.')
@@ -423,7 +453,16 @@ export default function App() {
     setConversations([])
   }
 
-  const hasAttachedResources = (currentConvData?.resources?.length || 0) > 0
+  // STRICT ISOLATION: Question typing enabled ONLY if current active chat itself has attached resources.
+  // Resources uploaded in previous or other chats NEVER enable question typing in this chat.
+  const hasAttachedResources = Boolean(
+    !loadingConv &&
+    activeConvId &&
+    currentConvData &&
+    currentConvData.id === activeConvId &&
+    Array.isArray(currentConvData.resources) &&
+    currentConvData.resources.length > 0
+  )
 
   return (
     <div className={`h-screen w-screen flex overflow-hidden ${darkMode ? 'dark bg-gray-950 text-gray-100' : 'bg-slate-50 text-gray-800'}`}>
@@ -901,14 +940,19 @@ export default function App() {
             <input
               type="text"
               value={promptInput}
-              onChange={e => setPromptInput(e.target.value)}
-              disabled={!hasAttachedResources || sendingMessage}
+              onChange={e => {
+                if (!hasAttachedResources) return
+                setPromptInput(e.target.value)
+              }}
+              disabled={!hasAttachedResources || sendingMessage || loadingConv}
               placeholder={
-                isListening
+                loadingConv
+                  ? 'Loading chat session…'
+                  : isListening
                   ? 'Listening… speak your question now…'
                   : hasAttachedResources
                   ? 'Ask anything about your study notes…'
-                  : '⚠️ Attach resources first using "+" to enable question typing…'
+                  : '⚠️ Current chat has no resources. Attach notes using "+" to type questions…'
               }
               className={`flex-1 bg-transparent px-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 ${
                 !hasAttachedResources ? 'cursor-not-allowed opacity-60' : ''
@@ -919,13 +963,17 @@ export default function App() {
             <button
               type="button"
               onClick={handleToggleSpeechRecognition}
-              disabled={!hasAttachedResources || sendingMessage}
+              disabled={!hasAttachedResources || sendingMessage || loadingConv}
               className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs ${
                 isListening
                   ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-950'
                   : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-indigo-700 dark:text-indigo-300'
               }`}
-              title={hasAttachedResources ? (isListening ? 'Stop listening' : 'Speak your question (Voice Input)') : 'Upload resources first to enable microphone'}
+              title={
+                hasAttachedResources
+                  ? (isListening ? 'Stop listening' : 'Speak your question (Voice Input)')
+                  : 'Current chat has no resources. Attach notes first to enable voice input'
+              }
               aria-label={isListening ? 'Stop microphone' : 'Start microphone'}
             >
               <span className="text-base leading-none">
@@ -936,9 +984,9 @@ export default function App() {
             {/* Rightmost Submit Button */}
             <button
               type="submit"
-              disabled={!hasAttachedResources || !promptInput.trim() || sendingMessage}
+              disabled={!hasAttachedResources || !promptInput.trim() || sendingMessage || loadingConv}
               className="w-10 h-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0"
-              title="Send Message"
+              title={hasAttachedResources ? "Send Message" : "Attach resources to this chat before sending"}
             >
               ➔
             </button>

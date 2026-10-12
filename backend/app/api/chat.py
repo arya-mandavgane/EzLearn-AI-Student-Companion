@@ -348,26 +348,31 @@ def send_chat_message(
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")
 
-    # 1. Enforce: User cannot chat without adding resources
+    # 1. Enforce: User cannot chat without adding resources to THIS specific conversation
     if not conv.resources:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No study resources attached to this chat yet. Please click the '+' button to add text notes, images, PDFs, or audio before chatting.",
+            detail="No study resources attached to this current chat. Resources uploaded in other chats do not apply. Please click the '+' button to add text notes, images, PDFs, or audio to this chat before typing questions.",
         )
 
     prompt = req.prompt.strip()
     if not prompt:
         raise HTTPException(status_code=422, detail="Message cannot be empty.")
 
-    # Aggregate ALL conversation resources (regardless of when they were added)
+    # Aggregate ALL resources attached to THIS specific conversation
     combined_notes = "\n\n---\n\n".join(
         f"[{r.resource_type.upper()} RESOURCE: {r.title}]\n{r.content}" for r in conv.resources
     )
 
-    # 2. RAG retrieval over this conversation's indexed chunks
+    # 2. RAG retrieval strictly over THIS conversation's indexed chunks (never leak other chats)
+    this_conv_prefix = f"{conv_id}-"
     q_vec = embed([prompt])[0] if embed([prompt]) else None
-    search_res = global_vector_store.search(query=prompt, query_embedding=q_vec, top_k=6)
-    relevant_chunks = [c for c, score in search_res if score >= 0.28]
+    search_res = global_vector_store.search(query=prompt, query_embedding=q_vec, top_k=12)
+    conv_chunks = [
+        (c, score) for c, score in search_res
+        if (c.chunk_id.startswith(this_conv_prefix) or (c.input_id and c.input_id.startswith(this_conv_prefix)))
+    ]
+    relevant_chunks = [c for c, score in conv_chunks if score >= 0.28]
 
     citations = [
         {"page": c.page, "snippet": c.snippet, "chunk_id": c.chunk_id} for c in relevant_chunks

@@ -9,6 +9,8 @@ export function Sidebar({
   apiUrl,
   currentUser,
   onOpenAuth,
+  isOpen = false,
+  onClose,
 }) {
   const [activeReportTab, setActiveReportTab] = useState(null) // 'daily' | 'weekly' | 'monthly' | null
   const [reportData, setReportData] = useState(null)
@@ -52,7 +54,19 @@ export function Sidebar({
   }
 
   return (
-    <aside className="w-80 h-full flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-colors select-none">
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs md:hidden transition-opacity"
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={`fixed md:static inset-y-0 left-0 z-50 w-72 sm:w-80 h-full flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-transform duration-300 ease-in-out select-none ${
+        isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+      }`}>
       
       {/* Brand Header */}
       <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
@@ -75,15 +89,26 @@ export function Sidebar({
             </span>
           </div>
         </div>
-        {currentUser ? (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-            ● Signed In
-          </span>
-        ) : (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-            Guest (Volatile)
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {currentUser ? (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              ● Signed In
+            </span>
+          ) : (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+              Guest
+            </span>
+          )}
+
+          {/* Close button on mobile drawer */}
+          <button
+            onClick={onClose}
+            className="md:hidden p-1.5 -mr-1 rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            title="Close menu"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Top Tiers 1-4 */}
@@ -125,7 +150,10 @@ export function Sidebar({
 
         {/* Tier 4: Start New Conversation Button */}
         <button
-          onClick={onNewConversation}
+          onClick={() => {
+            onNewConversation()
+            if (onClose) onClose()
+          }}
           className="w-full py-2.5 px-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-extrabold text-xs flex items-center justify-center gap-2 border border-indigo-200 dark:border-indigo-800 transition-all shadow-sm"
         >
           <span>➕</span> Start New Conversation
@@ -228,7 +256,10 @@ export function Sidebar({
           conversations.map(conv => (
             <div
               key={conv.id}
-              onClick={() => onSelectConv(conv.id)}
+              onClick={() => {
+                onSelectConv(conv.id)
+                if (onClose) onClose()
+              }}
               className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-xs font-semibold transition-all ${
                 activeConvId === conv.id
                   ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800'
@@ -255,6 +286,14 @@ export function Sidebar({
         )}
       </div>
 
+      {/* Sidebar Footer Credits */}
+      <div className="p-3 border-t border-gray-100 dark:border-gray-800 text-center select-none">
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">
+          Created by <span className="font-semibold text-gray-600 dark:text-gray-300">Arya Mandavgane</span> for <span className="font-bold text-indigo-600 dark:text-indigo-400">AIMPACT</span>
+        </p>
+      </div>
+
     </aside>
+  </>
   )
 }

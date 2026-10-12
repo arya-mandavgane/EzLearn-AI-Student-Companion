@@ -69,6 +69,7 @@ export default function App() {
   const [sendingMessage, setSendingMessage] = useState(false)
   const [errorNotice, setErrorNotice] = useState('')
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
   const messagesEndRef = useRef(null)
 
@@ -279,48 +280,72 @@ export default function App() {
         apiUrl={API_URL}
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthOpen(true)}
+        isOpen={isMobileSidebarOpen}
+        onClose={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* ── Main Chat Area ── */}
       <main className="flex-1 h-full flex flex-col min-w-0 bg-white dark:bg-gray-950 relative">
         
         {/* Top Navbar */}
-        <header className="h-14 border-b border-gray-100 dark:border-gray-800 px-6 flex items-center justify-between bg-white/80 dark:bg-gray-900/80 backdrop-blur z-10">
-          <div className="flex items-center gap-3">
-            <h2 className="font-extrabold text-sm md:text-base text-gray-800 dark:text-gray-100 truncate">
+        <header className="h-14 border-b border-gray-100 dark:border-gray-800 px-3 sm:px-6 flex items-center justify-between bg-white/80 dark:bg-gray-900/80 backdrop-blur z-10 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Mobile Hamburger Drawer Button */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="md:hidden p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800 flex items-center justify-center transition-colors"
+              title="Open Navigation Menu"
+              aria-label="Open navigation menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            {/* Mobile Brand Mark */}
+            <div className="md:hidden w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shrink-0 shadow-xs">
+              <span
+                className="text-xs font-bold italic tracking-tighter"
+                style={{ fontFamily: "'Brush Script MT', 'Dancing Script', 'Caveat', cursive, sans-serif" }}
+              >
+                ℰℓ
+              </span>
+            </div>
+
+            <h2 className="font-extrabold text-sm sm:text-base text-gray-800 dark:text-gray-100 truncate max-w-[140px] sm:max-w-xs md:max-w-none">
               {currentConvData?.title || 'Study Session'}
             </h2>
             {hasAttachedResources && (
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                📎 {currentConvData.resources.length} resource{currentConvData.resources.length > 1 ? 's' : ''}
+              <span className="hidden sm:inline-flex text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shrink-0">
+                📎 {currentConvData.resources.length}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Dark / Light Mode Button */}
             <button
               onClick={() => setDarkMode(!darkMode)}
-              className="p-2 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm transition-all"
+              className="p-1.5 sm:p-2 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 text-xs sm:text-sm transition-all"
               title="Toggle Dark/Light Mode"
             >
-              {darkMode ? '☀️ Light' : '🌙 Dark'}
+              {darkMode ? '☀️' : '🌙'}
             </button>
 
             {/* User status */}
             {currentUser ? (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gray-100 dark:bg-gray-800 text-xs">
-                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold uppercase">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-gray-100 dark:bg-gray-800 text-xs">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
                     {(currentUser.name || currentUser.email)[0]}
                   </span>
-                  <span className="font-bold text-gray-800 dark:text-gray-200 hidden md:inline">
-                    {currentUser.name} {currentUser.age ? `(${currentUser.age}y)` : ''}
+                  <span className="font-bold text-gray-800 dark:text-gray-200 hidden sm:inline truncate max-w-[90px]">
+                    {currentUser.name}
                   </span>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="px-2.5 py-1 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-gray-500 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 font-bold text-xs transition-all"
+                  className="px-2 sm:px-2.5 py-1 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-gray-500 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 font-bold text-[11px] sm:text-xs transition-all"
                   title="Sign out (Return to Guest mode)"
                 >
                   Sign Out
@@ -329,9 +354,9 @@ export default function App() {
             ) : (
               <button
                 onClick={() => setIsAuthOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] sm:text-xs shadow-sm transition-all whitespace-nowrap"
               >
-                Sign In / Register
+                Sign In
               </button>
             )}
           </div>
@@ -578,8 +603,11 @@ export default function App() {
           )}
 
           {/* ── Footer Credits ── */}
-          <footer className="text-center text-[11px] text-gray-400 dark:text-gray-500 font-medium pt-2 pb-0.5 select-none">
-            Created by Arya Mandavgane for AIMPACT
+          <footer className="text-center text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium pt-2 pb-0.5 select-none px-2 flex items-center justify-center gap-1.5 flex-wrap">
+            <span>Created by</span>
+            <span className="font-bold text-gray-700 dark:text-gray-300">Arya Mandavgane</span>
+            <span>for</span>
+            <span className="font-extrabold text-indigo-600 dark:text-indigo-400">AIMPACT</span>
           </footer>
         </div>
 

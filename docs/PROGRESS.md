@@ -1,10 +1,26 @@
 # PROGRESS
 
-Last updated: 2026-10-11 — Brand Updated to EzLearn (ℰℓ Logo), Navbar Cleaned, Auth & Theme Verified ✅
+Last updated: 2026-10-12 — Mobile and Desktop Responsive Layout Optimized, Drawer Navigation & Credits Verified ✅
 
 ---
 
 ## ✅ Done
+
+### Responsive Mobile & Desktop Layout Optimization (EzLearn)
+- **Off-Canvas Navigation Drawer for Mobile**:
+  - Transformed `frontend/src/components/Sidebar.jsx` into a mobile drawer: `fixed md:static inset-y-0 left-0 z-50 w-72 sm:w-80 transition-transform duration-300 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}`.
+  - Added tap-to-dismiss backdrop overlay (`fixed inset-0 z-40 bg-black/50 backdrop-blur-xs md:hidden`).
+  - Added dedicated mobile close button (`✕`) in sidebar header.
+  - Automatically closes mobile drawer when selecting conversations or starting a new chat session.
+- **Top Navbar Mobile Optimization**:
+  - Added hamburger menu button (`☰`) in `frontend/src/App.jsx` for screens below `768px` (`md:hidden`).
+  - Added cursive `ℰℓ` badge next to the session title on mobile for brand continuity.
+  - Responsive title truncation and touch-friendly padding (`px-3 sm:px-6`).
+  - Compact dark mode toggle and user status indicators to prevent horizontal overflow on narrow screens.
+- **Responsive Modals**:
+  - Updated `frontend/src/components/ResourceModal.jsx` and `frontend/src/components/AuthModal.jsx` with `max-h-[92vh] overflow-y-auto` and adaptive padding (`p-3 sm:p-4`) so on-screen keyboards don't clip form elements.
+- **Credits Footer**:
+  - Styled "Created by Arya Mandavgane for AIMPACT" across both desktop and mobile chat footers and sidebar footers with high-contrast, wrapped, non-clipping typography.
 
 ### Brand Identity & UI Polish (EzLearn)
 - **Brand Name**: Renamed application from "Study Companion" / "AI Study Companion" to **EzLearn**.

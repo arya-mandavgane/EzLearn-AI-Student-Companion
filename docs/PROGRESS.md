@@ -1,10 +1,19 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Hovering Backend Status Indicator & Auto-Wakeup Added ✅
+Last updated: 2026-10-12 — AI Pedagogical Suggestions on Quiz Attempt Completed & Verified ✅
 
 ---
 
 ## ✅ Done
+
+### Post-Quiz AI Pedagogical Suggestions (EzLearn)
+- **Automatic AI Suggestions on Quiz Attempt**:
+  - Whenever a student submits a quiz (Step 4 of the conversation turn), the backend evaluates accuracy, calculates question-by-question correctness, and prompts Gemini to produce targeted pedagogical suggestions.
+  - Returns strengths, comprehension gaps, and a personalized question encouraging deeper thinking.
+- **Enhanced UI Card in `TenQuestionQuiz.jsx`**:
+  - Formatted inside a rich gradient assessment card (`🤖 AI Performance Assessment & Suggestions`).
+  - Added dedicated **Must-Do Revision Topics** badge highlight for all missed topics, with a zero-weak-topics celebration badge on 100% scores.
+  - Resilient fallback ensuring feedback is always presented even if network delays occur.
 
 ### Hovering Backend Status Indicator & Auto-Wakeup (EzLearn)
 - **Hovering Status Circle Indicator**:

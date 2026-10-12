@@ -78,23 +78,52 @@ export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAt
         </div>
 
         {/* AI Pedagogical Suggestions */}
-        {aiSuggestions && (
-          <div className="bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-xl p-4 space-y-2 text-xs">
-            <div className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-300 uppercase tracking-wide">
-              <span>🤖</span> AI Performance Assessment & Suggestions
+        <div className="bg-gradient-to-br from-purple-50/90 via-indigo-50/50 to-purple-50/80 dark:from-purple-950/40 dark:via-indigo-950/30 dark:to-purple-950/40 border border-purple-200 dark:border-purple-800/80 rounded-2xl p-4 sm:p-5 space-y-3 text-xs shadow-xs">
+          <div className="flex items-center justify-between pb-2 border-b border-purple-200/60 dark:border-purple-800/60">
+            <div className="flex items-center gap-2 font-black text-purple-900 dark:text-purple-200 uppercase tracking-wider text-xs">
+              <span className="text-base">🤖</span>
+              <span>AI Performance Assessment & Suggestions</span>
             </div>
-            <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-200 border border-purple-300 dark:border-purple-700">
+              Personalized
+            </span>
+          </div>
+
+          {aiSuggestions ? (
+            <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed font-medium">
               {aiSuggestions}
             </p>
-          </div>
-        )}
+          ) : (
+            <div className="space-y-2">
+              <p className="text-gray-800 dark:text-gray-200 leading-relaxed font-medium">
+                {attemptResult.score >= 8
+                  ? `Outstanding mastery! You achieved ${attemptResult.score}/${attemptResult.total} (${attemptResult.accuracy_pct}%). You demonstrate a solid grasp of core fundamentals.`
+                  : attemptResult.score >= 5
+                  ? `Good effort! You scored ${attemptResult.score}/${attemptResult.total} (${attemptResult.accuracy_pct}%). You have a solid base, but key areas need targeted revision.`
+                  : `Needs revision: You scored ${attemptResult.score}/${attemptResult.total} (${attemptResult.accuracy_pct}%). Don't worry — review the concept notes and re-check the missed questions below.`}
+              </p>
+            </div>
+          )}
 
-        {/* Weak Topics to Review */}
-        {attemptResult.weak_topics?.length > 0 && (
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-xs text-amber-900 dark:text-amber-300">
-            <strong>📌 Must-Do Revision Topics:</strong> {attemptResult.weak_topics.join(', ')}
-          </div>
-        )}
+          {/* Weak Topics to Review */}
+          {attemptResult.weak_topics?.length > 0 ? (
+            <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/80 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
+              <span className="text-base shrink-0 leading-none">📌</span>
+              <div>
+                <span className="font-extrabold block mb-0.5">Must-Do Revision Topics:</span>
+                <span>{attemptResult.weak_topics.join(', ')}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 p-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/80 rounded-xl text-xs text-emerald-900 dark:text-emerald-200 flex items-start gap-2">
+              <span className="text-base shrink-0 leading-none">🌟</span>
+              <div>
+                <span className="font-extrabold block mb-0.5">Zero Weak Topics:</span>
+                <span>You answered all questions accurately! Ready to advance to the next topic.</span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Question Review Breakdown */}
         <div className="space-y-3">

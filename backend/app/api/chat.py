@@ -391,37 +391,41 @@ def send_chat_message(
         "further", "then", "once", "here", "there", "all", "any", "both", "each",
         "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only",
         "own", "same", "so", "than", "too", "very", "explain", "tell", "describe",
-        "give", "write", "define", "summary", "notes", "question", "answer", "please"
+        "give", "write", "define", "summary", "notes", "question", "answer", "please",
+        # Generic academic terms that appear in all disciplines
+        "formula", "theorem", "theory", "law", "rule", "definition", "concept",
+        "principle", "problem", "solution", "example", "method", "system", "type",
+        "types", "process", "approach", "model", "step", "steps", "meaning", "name",
     }
 
     q_tokens = {w for w in re.findall(r"\b[a-zA-Z]{3,}\b", prompt.lower()) if w not in _stopwords}
     notes_tokens = {w for w in re.findall(r"\b[a-zA-Z]{3,}\b", combined_notes.lower()) if w not in _stopwords}
     shared_tokens = q_tokens.intersection(notes_tokens)
 
-    # ── STEP 2: SCAN FILE CONTEXT & VERIFY SUBJECT DOMAIN VIA AI ───────────────
-    context_scan_prompt = f"""You are a strict academic verifier.
-A student uploaded study notes on a specific subject and asked a question.
-Your job is to identify the subject domain of the notes, the subject domain of the question, and determine if they match.
+    # ── STEP 2: VERIFY TOPIC IS ACTUALLY IN NOTES VIA STRICT AI ────────────────
+    context_scan_prompt = f"""You are a strict academic verification auditor.
+A student uploaded study notes on a specific topic and asked a question.
+Your job is to determine whether the student's question is about a concept that is ACTUALLY PRESENT OR TAUGHT in the uploaded notes.
 
 STUDENT QUESTION:
 {prompt}
 
-ATTACHED STUDY RESOURCES (Study notes uploaded in this chat):
+STUDENT'S UPLOADED STUDY NOTES:
 {combined_notes[:7000]}
 
-Rules:
-1. Identify "notes_subject": What academic subject are the uploaded notes about? (e.g. "Computer Science - Data Structures", "Operating Systems", "Organic Chemistry", "Macroeconomics").
-2. Identify "question_subject": What academic subject is the student's question about? (e.g. "Geography", "European History", "Computer Science", "Cooking", "World Geography").
-3. "same_domain": Are the notes subject and question subject within the exact same academic curriculum/field? (true or false). If notes are Computer Science and question is Geography, this MUST be false!
-4. "fits_context": Does the student's question belong within the specific syllabus and topics of the uploaded notes? (true or false).
+STRICT RULES:
+1. "notes_subject": State the exact academic subject of the uploaded notes (e.g. "Computer Science - Data Structures", "Operating Systems", etc.).
+2. "question_subject": State the exact academic subject of the student question (e.g. "Geometry - Pythagoras Theorem", "World Geography", "Biology", etc.).
+3. "is_covered_in_notes": Answer true ONLY if the topic of the question ('{prompt}') is directly discussed, defined, or taught in the uploaded notes above.
+4. If the notes are about Computer Science and the question is about Geometry/Math (like Pythagoras theorem), Geography, Literature, etc., "is_covered_in_notes" MUST BE FALSE.
+5. If the question cannot be answered using the concepts in the uploaded notes, "is_covered_in_notes" MUST BE FALSE.
 
 Respond ONLY with valid JSON:
 {{
   "notes_subject": "Academic subject of the notes",
   "question_subject": "Academic subject of the question",
-  "same_domain": false,
-  "fits_context": false,
-  "reason": "Clear explanation of why it fits or does NOT fit the notes context"
+  "is_covered_in_notes": false,
+  "reason": "Why this is or is not covered in the notes"
 }}
 """
     raw_scan = generate(context_scan_prompt)
@@ -447,19 +451,16 @@ Respond ONLY with valid JSON:
         if isinstance(scan_data, dict):
             notes_domain = scan_data.get("notes_subject") or notes_domain
             q_domain = scan_data.get("question_subject") or q_domain
-            ai_same_domain = _parse_bool(scan_data.get("same_domain"), default=False)
-            ai_fits_context = _parse_bool(scan_data.get("fits_context"), default=False)
+            is_covered = _parse_bool(scan_data.get("is_covered_in_notes"), default=False)
 
-            if ai_same_domain and ai_fits_context:
-                fits_context = True
-            elif ai_fits_context and (len(shared_tokens) > 0 or len(relevant_chunks) > 0):
+            if is_covered:
                 fits_context = True
     except Exception as e:
         logger.warning("Error parsing scan json: %s", e)
-        fits_context = len(relevant_chunks) > 0 and len(shared_tokens) > 0
+        fits_context = False
 
-    # HARD ENFORCEMENT: If the question shares ZERO meaningful keywords with the notes AND has ZERO relevant chunks, it is 100% an out-of-context outlier topic!
-    if len(shared_tokens) == 0 and len(relevant_chunks) == 0:
+    # HARD ENFORCEMENT: If the question shares ZERO meaningful topic keywords with the notes OR has zero vector chunks, it CANNOT be answered from the notes!
+    if len(shared_tokens) == 0:
         fits_context = False
 
     # ── CASE A: QUESTION DOES NOT FIT IN FILE CONTEXT ─────────────────────────

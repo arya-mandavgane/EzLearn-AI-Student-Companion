@@ -1,10 +1,19 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Strict Multi-Layer Domain Alignment & Lexical Gating Implemented (Fixed Off-Topic Leak) ✅
+Last updated: 2026-10-12 — Direct Topic Coverage Audit & Generic Term Filtering Implemented (Blocked Math/Off-Topic Leaks) ✅
 
 ---
 
 ## ✅ Done
+
+### Direct Topic Coverage Audit & Generic Term Filtering (EzLearn)
+- **Eliminated False-Positive Academic Matches**:
+  - Filtered generic academic words ("formula", "theorem", "law", "rule", "definition", "concept", "method") from keyword overlap matching so they cannot cause questions like "pythagoras theorem formula" to match computer science notes (which mention words like "formula" or "Master Theorem").
+- **Strict `is_covered_in_notes` Direct Audit**:
+  - Replaced ambiguous domain matching with a direct binary audit: *"Is the topic of the question ('{prompt}') actually taught or present in the uploaded notes?"*.
+  - If the uploaded notes are about Computer Science and the question asks about Math/Geometry (e.g. Pythagoras theorem), Geography, or other subjects not in the notes, `is_covered_in_notes` evaluates to `false`.
+- **Zero Shared Topic Tokens Hard Enforcement**:
+  - If the question contains zero topic keywords shared with the uploaded notes (`len(shared_tokens) == 0`), it is hard-rejected immediately without exception.
 
 ### Strict Multi-Layer Domain Alignment & Lexical Gating (EzLearn)
 - **Root Cause Resolution**:

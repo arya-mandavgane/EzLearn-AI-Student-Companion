@@ -399,60 +399,28 @@ Answer with valid JSON:
         # Fallback heuristic: if no chunk matched above threshold and combined notes don't share keywords
         is_outlier = len(relevant_chunks) == 0
 
-    # ── CASE A: OUTLIER TOPIC ───────────────────────────────────────────────────
+    # ── CASE A: OUTLIER TOPIC (NOT PRESENT IN SOURCES) ──────────────────────────
     # If question is NOT in any of the resources:
-    # 1. Specifically tell user this is an outlier topic not present in their resources
-    # 2. Give ONLY a single paragraph explanation
-    # 3. DO NOT generate any simulation or quiz
-    # 4. Provide trusted web reference sources (titles + URLs)
+    # 1. Do NOT give answer to questions that are not present in sources.
+    # 2. Specifically inform user that topic was not found in attached materials.
+    # 3. DO NOT generate any simulation or quiz.
     if is_outlier:
-        outlier_exp_prompt = f"""The student asked about a topic that is NOT present in any of their attached study resources.
-STUDENT QUESTION: {prompt}
-
-Provide a response adhering strictly to these rules:
-1) State clearly that this topic was not found in their attached study resources.
-2) Provide a single concise, clear explanation paragraph addressing their question directly.
-3) Provide 2-3 trusted web references or documentation sources (e.g., Wikipedia, MDN, GeeksforGeeks, Khan Academy, official docs).
-4) Do not write multiple sections, bulleted lists, simulations, or quiz questions. Just one clean, well-written paragraph.
-
-Respond with valid JSON:
-{{
-  "topic": "{prompt}",
-  "is_outlier": true,
-  "notice": "This topic was not found in any of your attached study resources. Here is a brief overview to help you understand it:",
-  "paragraph_explanation": "Single paragraph concise explanation of the topic.",
-  "web_sources": [
-    {{"title": "Source or Article Name", "url": "https://..."}},
-    {{"title": "Source or Article Name", "url": "https://..."}}
-  ]
-}}
-"""
-        raw_outlier = generate(outlier_exp_prompt)
-        try:
-            from app.api.explain import _parse_ai_json
-            outlier_data = _parse_ai_json(raw_outlier, expected_type=dict)
-            if not isinstance(outlier_data, dict):
-                outlier_data = {}
-        except Exception:
-            outlier_data = {}
-
-        paragraph = outlier_data.get("paragraph_explanation") or f"This topic ('{prompt}') is not mentioned in any of your attached study resources. In general, {prompt} refers to a concept commonly explored in related fields, functioning as a foundational principle to help address specific problems."
-        notice = outlier_data.get("notice") or "This topic was not found in any of your attached study resources. Here is a brief single-paragraph overview:"
-        web_sources = outlier_data.get("web_sources") or [
-            {"title": f"Wikipedia - {prompt}", "url": f"https://en.wikipedia.org/wiki/{prompt.replace(' ', '_')}"},
-            {"title": f"Google Search - {prompt}", "url": f"https://www.google.com/search?q={prompt.replace(' ', '+')}"}
-        ]
+        notice = (
+            f"I cannot answer this question because '{prompt}' is not present in your attached study resources. "
+            "EzLearn answers questions strictly based on your uploaded notes and materials. "
+            "Please upload study materials covering this topic or ask a question related to your attached notes."
+        )
 
         explanation_data = {
             "topic": prompt,
             "is_outlier": True,
             "outlier_notice": notice,
-            "body": paragraph,
-            "summary": paragraph,
+            "body": None,
+            "summary": None,
             "real_life_picture": None,
             "key_terms": [],
-            "external_sources_used": True,
-            "web_sources": web_sources,
+            "external_sources_used": False,
+            "web_sources": [],
         }
 
         # Save record with NO simulation and NO quiz
@@ -479,7 +447,7 @@ Respond with valid JSON:
             "simulation": None,
             "quiz": None,
             "citations": [],
-            "used_external_web": True,
+            "used_external_web": False,
             "is_outlier": True,
         }
 
@@ -549,20 +517,21 @@ Respond with valid JSON:
     if "external_sources_used" not in explanation_data:
         explanation_data["external_sources_used"] = used_external_web
 
-    # 4. Step 3: Demonstration / Simulation Plan
+    # 4. Step 3: Demonstration / Simulation Plan (Single unified view showing all parts)
     topic_name = explanation_data.get("topic") or prompt
-    sim_prompt = f"""Design a visual step-by-step interactive demonstration/simulation for: '{topic_name}'.
+    sim_prompt = f"""Design a visual single-phase process diagram / interactive demonstration for: '{topic_name}'.
+Instead of multi-phase step navigation or paging, design a comprehensive single-phase view showing all its interconnected parts/components clearly.
 Return valid JSON:
 {{
   "template": "process" | "stack" | "queue" | "sorting",
-  "title": "Interactive Demonstration of {topic_name}",
-  "intro": "2 sentences introducing what this simulation demonstrates.",
-  "steps": [
-    {{"step_number": 1, "description": "Step 1 description", "element_states": ["A", "B"]}},
-    {{"step_number": 2, "description": "Step 2 description", "element_states": ["A", "B", "C"]}},
-    {{"step_number": 3, "description": "Step 3 description", "element_states": ["B", "C"]}}
+  "title": "Interactive Process Demonstration: {topic_name}",
+  "intro": "1-2 sentences introducing the entire system and how all components operate together in a single unified process.",
+  "parts": [
+    {{"id": 1, "name": "Part / Component 1", "role": "Specific role or function in this process", "details": "Detailed explanation of how this part operates."}},
+    {{"id": 2, "name": "Part / Component 2", "role": "Specific role or function in this process", "details": "Detailed explanation of how this part operates."}},
+    {{"id": 3, "name": "Part / Component 3", "role": "Specific role or function in this process", "details": "Detailed explanation of how this part operates."}}
   ],
-  "analogy": "Everyday analogy for this process."
+  "analogy": "Everyday analogy explaining this process."
 }}
 """
     raw_sim = generate(sim_prompt)
@@ -573,14 +542,14 @@ Return valid JSON:
     except Exception:
         simulation_data = {
             "template": "process",
-            "title": f"Process Simulation: {topic_name}",
-            "intro": f"Step through how {topic_name} works visually.",
-            "steps": [
-                {"step_number": 1, "description": "Initial input phase", "element_states": ["Input"]},
-                {"step_number": 2, "description": "Transformation phase", "element_states": ["Processing"]},
-                {"step_number": 3, "description": "Output stage", "element_states": ["Result"]},
+            "title": f"Process Map: {topic_name}",
+            "intro": f"Single comprehensive visual view of {topic_name} displaying all its interconnected parts simultaneously.",
+            "parts": [
+                {"id": 1, "name": "Input / Ingestion", "role": "Receives raw data, signals, or stimulus", "details": "The entry boundary where inputs are captured and validated."},
+                {"id": 2, "name": "Core Processing", "role": "Applies rules, algorithms, or transformations", "details": "Processes and computes state changes across the system."},
+                {"id": 3, "name": "Output & Resolution", "role": "Delivers formatted results or final state", "details": "The final stage producing actionable outputs and persisting results."}
             ],
-            "analogy": "A factory assembly line turning raw inputs into results.",
+            "analogy": "A factory assembly line turning raw inputs into completed products.",
         }
 
     # 5. Step 4: Generate 10-Question Quiz based on all attached resources

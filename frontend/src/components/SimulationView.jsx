@@ -906,137 +906,202 @@ export function ProcessSimulationView({ plan, onBack }) {
 }
 
 function UniversalProcessSimulation({ plan, onBack }) {
-  const [currentStepIdx, setCurrentStepIdx] = useState(0)
+  // Normalize parts from plan.parts or plan.steps
+  const parts = React.useMemo(() => {
+    if (Array.isArray(plan?.parts) && plan.parts.length > 0) {
+      return plan.parts.map((p, idx) => ({
+        id: p.id || idx + 1,
+        name: p.name || `Part ${idx + 1}`,
+        role: p.role || 'Process Component',
+        details: p.details || p.description || '',
+        status: p.status || 'active',
+      }))
+    }
+    if (Array.isArray(plan?.steps) && plan.steps.length > 0) {
+      return plan.steps.map((s, idx) => ({
+        id: s.id || s.step_number || idx + 1,
+        name: s.title || s.name || `Part ${idx + 1}`,
+        role: s.role || (s.element_states ? s.element_states.join(' • ') : `Component ${idx + 1}`),
+        details: s.description || s.details || '',
+        status: 'active',
+      }))
+    }
+    return [
+      { id: 1, name: 'Input & Initiation', role: 'Receives and validates input trigger', details: 'The entry point capturing raw parameters or signals.', status: 'active' },
+      { id: 2, name: 'Core Processing Unit', role: 'Applies state transformations and logical rules', details: 'Executes core algorithms, computation, or business rules.', status: 'active' },
+      { id: 3, name: 'Output & Resolution', role: 'Produces formatted output and updates state', details: 'The final destination delivering completed results.', status: 'active' },
+    ]
+  }, [plan])
+
+  const [activePartId, setActivePartId] = useState(parts[0]?.id || 1)
+  const [isSimulatingFlow, setIsSimulatingFlow] = useState(false)
   const [selectedPrediction, setSelectedPrediction] = useState(null)
   const [showPredictionFeedback, setShowPredictionFeedback] = useState(false)
 
-  const steps = plan?.steps || []
-  const currentStep = steps[currentStepIdx] || {
-    step_number: 1,
-    title: 'Process Overview',
-    description: plan?.intro || 'Interactive demonstration',
-    element_states: [],
+  // Simulation flow animation across all parts
+  const handleRunFlow = () => {
+    if (isSimulatingFlow) return
+    setIsSimulatingFlow(true)
+    parts.forEach((p, idx) => {
+      setTimeout(() => {
+        setActivePartId(p.id)
+        if (idx === parts.length - 1) {
+          setTimeout(() => setIsSimulatingFlow(false), 900)
+        }
+      }, idx * 800)
+    })
   }
 
-  const prediction = currentStep.prediction
-
-  function handleNext() {
-    if (currentStepIdx < steps.length - 1) {
-      setCurrentStepIdx(prev => prev + 1)
-      setSelectedPrediction(null)
-      setShowPredictionFeedback(false)
-    }
-  }
-
-  function handlePrev() {
-    if (currentStepIdx > 0) {
-      setCurrentStepIdx(prev => prev - 1)
-      setSelectedPrediction(null)
-      setShowPredictionFeedback(false)
-    }
-  }
-
-  const items = currentStep.items || currentStep.element_states || []
+  const prediction = plan?.prediction || plan?.steps?.[0]?.prediction
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-indigo-100 dark:border-gray-700 p-5 space-y-4">
-      <div className="flex items-center justify-between pb-2 border-b dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-800 rounded-3xl border border-indigo-100 dark:border-gray-700 p-5 sm:p-6 space-y-5 shadow-xs">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b dark:border-gray-700">
         <div>
-          <h4 className="font-extrabold text-indigo-700 dark:text-indigo-400 text-sm">
-            {plan?.title || 'Interactive Demonstration'}
-          </h4>
-          <p className="text-[11px] text-gray-500 dark:text-gray-400">{plan?.intro}</p>
+          <div className="flex items-center gap-2">
+            <span className="text-base">⚙️</span>
+            <h4 className="font-extrabold text-indigo-700 dark:text-indigo-400 text-sm sm:text-base">
+              {plan?.title || 'Single-Phase Process Architecture'}
+            </h4>
+          </div>
+          <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {plan?.intro || 'Comprehensive single-phase visual diagram showing all system components simultaneously.'}
+          </p>
         </div>
         {onBack && (
           <button
             onClick={onBack}
-            className="text-[11px] font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            className="text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
           >
             ✕ Close
           </button>
         )}
       </div>
 
+      {/* Everyday Analogy Banner */}
       {plan?.analogy && (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-xs text-amber-900 dark:text-amber-200">
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl p-3.5 text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
           💡 <strong>Everyday Analogy:</strong> {plan.analogy}
         </div>
       )}
 
-      {/* Stepper progress */}
-      <div className="space-y-1">
-        <div className="flex justify-between text-[11px] font-bold text-gray-500 dark:text-gray-400">
-          <span>Step {currentStepIdx + 1} of {Math.max(steps.length, 1)}</span>
-          <span className="text-indigo-600 dark:text-indigo-400">{currentStep.title || `Phase ${currentStepIdx + 1}`}</span>
-        </div>
-        <div className="flex gap-1 h-1.5">
-          {steps.map((_, idx) => (
-            <div
-              key={idx}
-              onClick={() => setCurrentStepIdx(idx)}
-              className={`flex-1 rounded-full cursor-pointer transition-all ${
-                idx === currentStepIdx
-                  ? 'bg-indigo-600 dark:bg-indigo-400'
-                  : idx < currentStepIdx
-                  ? 'bg-indigo-300 dark:bg-indigo-700'
-                  : 'bg-gray-200 dark:bg-gray-700'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Narrative */}
-      <div className="bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-xl p-3 text-xs text-gray-800 dark:text-gray-200 leading-relaxed">
-        {currentStep.description}
-      </div>
-
-      {/* Dynamic Visual Simulation Pipeline Canvas */}
-      <div className="p-5 bg-gradient-to-br from-slate-900 via-gray-900 to-indigo-950 rounded-2xl border border-indigo-900/50 shadow-inner flex flex-col items-center justify-center min-h-[170px] space-y-4 relative overflow-hidden">
-        {/* Background circuit grid effect */}
+      {/* Visual Canvas: Single Phase Pipeline Flow */}
+      <div className="p-5 bg-gradient-to-br from-slate-900 via-gray-900 to-indigo-950 rounded-2xl border border-indigo-900/50 shadow-inner space-y-4 relative overflow-hidden">
+        {/* Background circuit grid */}
         <div className="absolute inset-0 bg-[radial-gradient(#4f46e5_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
 
-        <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400/90 z-10 flex items-center gap-1.5 self-start">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-          <span>Active State Visualization • Phase {currentStepIdx + 1}</span>
+        <div className="flex items-center justify-between z-10 relative flex-wrap gap-2">
+          <div className="text-[10px] font-black uppercase tracking-widest text-indigo-300 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+            <span>Unified Process Pipeline ({parts.length} Connected Parts)</span>
+          </div>
+
+          <button
+            onClick={handleRunFlow}
+            disabled={isSimulatingFlow}
+            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1.5"
+          >
+            <span>{isSimulatingFlow ? '⚡ Flowing…' : '▶ Simulate Flow'}</span>
+          </button>
         </div>
 
-        {/* Visual Pipeline Nodes with Flow Connectors */}
-        <div className="w-full flex items-center justify-center gap-2 sm:gap-3 flex-wrap z-10 py-2">
-          {(items.length > 0 ? items : [currentStep.title || 'Process Stage']).map((it, idx) => {
-            const label = typeof it === 'string' ? it : it.label || `Node ${idx + 1}`
-            const isActive = idx === (currentStepIdx % Math.max(items.length, 1)) || items.length <= 1
+        {/* Visual interconnected nodes in single view */}
+        <div className="w-full flex items-center justify-start sm:justify-center gap-2 sm:gap-3 overflow-x-auto py-3 z-10 relative">
+          {parts.map((p, idx) => {
+            const isSelected = p.id === activePartId
             return (
-              <React.Fragment key={idx}>
+              <React.Fragment key={p.id}>
                 {idx > 0 && (
-                  <div className="text-indigo-400/60 font-mono text-sm select-none flex items-center">
-                    <span className="animate-pulse">➔</span>
+                  <div className="text-indigo-400/80 font-mono text-base select-none shrink-0 flex items-center px-0.5">
+                    <span className={isSimulatingFlow ? 'animate-pulse text-indigo-300 font-bold' : ''}>➔</span>
                   </div>
                 )}
-                <div
-                  className={`px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition-all duration-300 flex items-center gap-2 ${
-                    isActive
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white ring-2 ring-indigo-400 scale-105 shadow-indigo-500/30'
-                      : 'bg-gray-800/90 text-gray-300 border border-gray-700/80 hover:bg-gray-700'
+                <button
+                  type="button"
+                  onClick={() => setActivePartId(p.id)}
+                  className={`group px-3.5 py-2.5 rounded-2xl text-left font-bold text-xs shadow-md transition-all duration-300 shrink-0 border cursor-pointer ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white border-indigo-400 ring-2 ring-indigo-400/60 scale-105 shadow-indigo-500/40'
+                      : 'bg-gray-800/90 text-gray-200 border-gray-700/80 hover:bg-gray-750 hover:border-indigo-500/50'
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-300 animate-pulse' : 'bg-gray-500'}`} />
-                  <span className="tracking-tight">{label}</span>
-                </div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-black uppercase tracking-wider ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-indigo-950 text-indigo-300 border border-indigo-800'
+                    }`}>
+                      Part {idx + 1}
+                    </span>
+                    <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-300 animate-pulse' : 'bg-gray-500'}`} />
+                  </div>
+                  <div className="tracking-tight text-xs whitespace-nowrap">{p.name}</div>
+                  <div className={`text-[10px] truncate max-w-[130px] font-normal ${isSelected ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    {p.role}
+                  </div>
+                </button>
               </React.Fragment>
             )
           })}
         </div>
+      </div>
 
-        {/* Live Step Insight Pill */}
-        <div className="z-10 bg-indigo-900/40 border border-indigo-500/30 px-3 py-1 rounded-full text-[11px] text-indigo-200 font-mono">
-          ⚡ {currentStep.title || `Phase ${currentStepIdx + 1}`} In Progress
+      {/* Parts Breakdown Section — Shows ALL parts properly in a unified view */}
+      <div className="space-y-3 pt-1">
+        <div className="flex items-center justify-between">
+          <h5 className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+            <span>📋</span> All Process Components ({parts.length} Parts):
+          </h5>
+          <span className="text-[11px] text-gray-400">Click any part to inspect</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {parts.map((p, idx) => {
+            const isSelected = p.id === activePartId
+            return (
+              <div
+                key={p.id}
+                onClick={() => setActivePartId(p.id)}
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-1.5 ${
+                  isSelected
+                    ? 'bg-indigo-50/90 dark:bg-indigo-950/50 border-indigo-300 dark:border-indigo-700 ring-2 ring-indigo-400/40 shadow-xs'
+                    : 'bg-gray-50/70 dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-800'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                  }`}>
+                    Part {idx + 1}
+                  </span>
+                  {isSelected && (
+                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                      Active Focus
+                    </span>
+                  )}
+                </div>
+
+                <h6 className="font-extrabold text-xs text-gray-900 dark:text-gray-100">
+                  {p.name}
+                </h6>
+
+                <div className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                  {p.role}
+                </div>
+
+                <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed pt-1 border-t dark:border-gray-800">
+                  {p.details || 'Interconnected component supporting the overall process workflow.'}
+                </p>
+              </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* Predict what happens next */}
+      {/* Optional Prediction Check */}
       {prediction && (
-        <div className="bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl p-3.5 space-y-2">
+        <div className="bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-3.5 space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900 dark:text-indigo-300">
             <span>🎯</span>
             <span>Predict: {prediction.question}</span>
@@ -1049,7 +1114,7 @@ function UniversalProcessSimulation({ plan, onBack }) {
                   setSelectedPrediction(optIdx)
                   setShowPredictionFeedback(true)
                 }}
-                className={`w-full text-left p-2 rounded-lg text-xs border transition-all ${
+                className={`w-full text-left p-2 rounded-xl text-xs border transition-all ${
                   selectedPrediction === optIdx
                     ? optIdx === prediction.correct_index
                       ? 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold dark:bg-emerald-950/50 dark:text-emerald-200'
@@ -1068,24 +1133,6 @@ function UniversalProcessSimulation({ plan, onBack }) {
           )}
         </div>
       )}
-
-      {/* Controls */}
-      <div className="flex items-center justify-between pt-2">
-        <button
-          onClick={handlePrev}
-          disabled={currentStepIdx === 0}
-          className="px-3 py-1.5 rounded-lg border dark:border-gray-700 text-xs font-bold disabled:opacity-30"
-        >
-          ◀ Prev
-        </button>
-        <button
-          onClick={handleNext}
-          disabled={currentStepIdx >= steps.length - 1}
-          className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-30"
-        >
-          {currentStepIdx >= steps.length - 1 ? 'Complete 🎉' : 'Next Step ▶'}
-        </button>
-      </div>
     </div>
   )
 }

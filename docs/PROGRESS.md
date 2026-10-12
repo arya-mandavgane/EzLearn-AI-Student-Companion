@@ -1,10 +1,28 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Clickable Web Sources & Reference Links for External/Outlier Topics Added ✅
+Last updated: 2026-10-12 — Resource Gating, Question Display during Generation, Strict Outlier Rejection & Single-Phase Process Simulation Completed ✅
 
 ---
 
 ## ✅ Done
+
+### Resource Gating, Outlier Rejection & Single-Phase Process Simulation (EzLearn)
+1. **Resource Enforcement Before Question Typing**:
+   - The user cannot type or submit questions in a chat without attaching at least one study resource (text note, image, PDF, or audio).
+   - The question input and speech-to-text button remain disabled with a helpful placeholder: `⚠️ Attach resources first using "+" to enable question typing…`.
+   - Backend `/api/chat/conversations/{conv_id}/messages` rejects prompts with HTTP 400 if no resources are attached to that chat.
+
+2. **Display User Question Above Generating Indicator**:
+   - When a question is submitted and the answer is being generated, the user's prompt is immediately displayed in a `"What You Asked"` message bubble positioned directly above the animated generating status box.
+
+3. **Strict Outlier Question Rejection**:
+   - Queries not covered in the attached study materials are strictly rejected.
+   - The assistant does not answer or explain outlier topics; instead, it provides a clear notice: *"I cannot answer this question because '{prompt}' is not present in your attached study resources. EzLearn answers questions strictly based on your uploaded notes and materials."*
+   - Suppresses simulations, quizzes, and external explanations entirely for outlier queries.
+
+4. **Single-Phase Process Simulation**:
+   - Replaced multi-phase/multi-step navigation ("Phase 1 of 3", "Step 1 of 3", Next/Prev buttons) in `UniversalProcessSimulation` (`frontend/src/components/SimulationView.jsx`) with a **single unified visual architecture view**.
+   - Displays all process parts simultaneously in an interconnected pipeline with flow connectors (`➔`), live flow simulation (`▶ Simulate Flow`), and interactive component inspection cards detailing each part's name, role, and operation.
 
 ### Web Sources & External Reference Citations (EzLearn)
 - **External Web Reference Links**:

@@ -77,6 +77,7 @@ export default function App() {
   // Chat input state
   const [promptInput, setPromptInput] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
+  const [pendingQuestion, setPendingQuestion] = useState('')
   const [errorNotice, setErrorNotice] = useState('')
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
@@ -303,24 +304,20 @@ export default function App() {
     const text = promptInput.trim()
     if (!text || !activeConvId) return
 
+    // Strict requirement: User must upload resources before chatting
+    const hasResources = (currentConvData?.resources?.length || 0) > 0
+    if (!hasResources) {
+      setErrorNotice('⚠️ Please attach study notes, images, PDFs, or audio first using the "+" button before asking questions.')
+      setIsResourceModalOpen(true)
+      return
+    }
+
+    setPendingQuestion(text)
     setSendingMessage(true)
     setErrorNotice('')
     setPromptInput('')
 
     try {
-      // If user typed question without manual resources, auto-add initial topic note
-      const hasResources = (currentConvData?.resources?.length || 0) > 0
-      if (!hasResources) {
-        await fetch(`${API_URL}/api/chat/conversations/${activeConvId}/resources/text`, {
-          method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({
-            title: `Study Topic: ${text.slice(0, 40)}`,
-            text: `Core student inquiry and study topic: ${text}. Provide complete coverage, intuitive explanation, real-world visual demonstration, and a comprehensive 10-question quiz.`,
-          }),
-        })
-      }
-
       const res = await fetch(`${API_URL}/api/chat/conversations/${activeConvId}/messages`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -339,6 +336,7 @@ export default function App() {
       setErrorNotice('Could not reach backend to send message.')
     } finally {
       setSendingMessage(false)
+      setPendingQuestion('')
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 200)
     }
   }
@@ -703,11 +701,19 @@ export default function App() {
                   <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 space-y-4 shadow-sm">
                     <div className="flex items-center justify-between pb-2 border-b dark:border-gray-800 flex-wrap gap-2">
                       <h4 className="font-extrabold text-base text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                        <span>💡</span> Explanation: {msg.explanation.topic || 'Concept Overview'}
+                        {msg.explanation.is_outlier ? (
+                          <>
+                            <span className="text-amber-500">⚠️</span> Question Not in Attached Resources
+                          </>
+                        ) : (
+                          <>
+                            <span>💡</span> Explanation: {msg.explanation.topic || 'Concept Overview'}
+                          </>
+                        )}
                       </h4>
                       {msg.explanation.is_outlier ? (
                         <span className="text-[10px] bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
-                          <span>⚠️</span> Outlier Topic (Not Found in Resources)
+                          <span>🚫</span> Not Answered (Outlier)
                         </span>
                       ) : msg.explanation.external_sources_used ? (
                         <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-full font-bold">
@@ -718,9 +724,12 @@ export default function App() {
 
                     {/* Outlier Notice */}
                     {msg.explanation.outlier_notice && (
-                      <div className="p-3 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs text-amber-900 dark:text-amber-200 font-medium leading-relaxed flex items-start gap-2">
-                        <span className="text-base shrink-0 leading-none">ℹ️</span>
-                        <span>{msg.explanation.outlier_notice}</span>
+                      <div className="p-4 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs text-amber-900 dark:text-amber-200 font-medium leading-relaxed flex items-start gap-3">
+                        <span className="text-base shrink-0 leading-none">⚠️</span>
+                        <div className="space-y-1">
+                          <p className="font-bold text-amber-950 dark:text-amber-100">Topic not covered in study materials</p>
+                          <p>{msg.explanation.outlier_notice}</p>
+                        </div>
                       </div>
                     )}
 
@@ -824,15 +833,36 @@ export default function App() {
             </div>
           ))}
 
-          {/* Loading indicator while AI is generating */}
+          {/* Loading indicator with User's Question Shown Above */}
           {sendingMessage && (
-            <div className="max-w-xl p-5 bg-white dark:bg-gray-900 rounded-3xl border border-indigo-100 dark:border-gray-800 space-y-2 animate-pulse">
-              <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/3" />
-              <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-full" />
-              <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-4/5" />
-              <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold pt-2">
-                ✨ Generating explanation, simulation, and 10-question quiz…
-              </p>
+            <div className="space-y-4 max-w-3xl mx-auto animate-fadeIn">
+              {/* User's Question Bubble Above Generating Indicator */}
+              {pendingQuestion && (
+                <div className="flex justify-end">
+                  <div className="bg-indigo-600 text-white rounded-3xl rounded-tr-xs px-5 py-3.5 max-w-xl text-sm font-medium shadow-md">
+                    <div className="text-[10px] uppercase font-black text-indigo-200 tracking-wider mb-1">
+                      What You Asked
+                    </div>
+                    <div>{pendingQuestion}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Generating Answer Message Box */}
+              <div className="max-w-xl p-5 bg-white dark:bg-gray-900 rounded-3xl border border-indigo-100 dark:border-gray-800 space-y-2 animate-pulse shadow-xs">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping" />
+                  <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                    Generating Answer from Attached Resources…
+                  </span>
+                </div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/3" />
+                <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-full" />
+                <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-4/5" />
+                <p className="text-[11px] text-gray-400 dark:text-gray-500 pt-2 font-medium">
+                  ✨ Synthesizing explanation, visual demonstration, and 10-question quiz…
+                </p>
+              </div>
             </div>
           )}
 
@@ -872,28 +902,30 @@ export default function App() {
               type="text"
               value={promptInput}
               onChange={e => setPromptInput(e.target.value)}
-              disabled={sendingMessage}
+              disabled={!hasAttachedResources || sendingMessage}
               placeholder={
                 isListening
                   ? 'Listening… speak your question now…'
                   : hasAttachedResources
                   ? 'Ask anything about your study notes…'
-                  : 'Type your study question or topic here…'
+                  : '⚠️ Attach resources first using "+" to enable question typing…'
               }
-              className="flex-1 bg-transparent px-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
+              className={`flex-1 bg-transparent px-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 ${
+                !hasAttachedResources ? 'cursor-not-allowed opacity-60' : ''
+              }`}
             />
 
             {/* Microphone Voice Button */}
             <button
               type="button"
               onClick={handleToggleSpeechRecognition}
-              disabled={sendingMessage}
+              disabled={!hasAttachedResources || sendingMessage}
               className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs ${
                 isListening
                   ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-950'
                   : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-indigo-700 dark:text-indigo-300'
               }`}
-              title={isListening ? 'Stop listening' : 'Speak your question (Voice Input)'}
+              title={hasAttachedResources ? (isListening ? 'Stop listening' : 'Speak your question (Voice Input)') : 'Upload resources first to enable microphone'}
               aria-label={isListening ? 'Stop microphone' : 'Start microphone'}
             >
               <span className="text-base leading-none">
@@ -904,7 +936,7 @@ export default function App() {
             {/* Rightmost Submit Button */}
             <button
               type="submit"
-              disabled={!promptInput.trim() || sendingMessage}
+              disabled={!hasAttachedResources || !promptInput.trim() || sendingMessage}
               className="w-10 h-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0"
               title="Send Message"
             >

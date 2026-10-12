@@ -70,8 +70,10 @@ export default function App() {
   const [errorNotice, setErrorNotice] = useState('')
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [isListening, setIsListening] = useState(false)
 
   const messagesEndRef = useRef(null)
+  const recognitionRef = useRef(null)
 
   // Apply dark mode class to root
   useEffect(() => {
@@ -255,6 +257,81 @@ export default function App() {
     } finally {
       setSendingMessage(false)
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 200)
+    }
+  }
+
+  // Voice speech-to-text recognition
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [])
+
+  function handleToggleSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      setErrorNotice('Voice recognition is not supported in this browser. Please try Google Chrome or Edge.')
+      return
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch {
+          // ignore
+        }
+      }
+      setIsListening(false)
+      return
+    }
+
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.lang = 'en-US'
+      recognition.continuous = false
+      recognition.interimResults = true
+
+      recognition.onstart = () => {
+        setIsListening(true)
+        setErrorNotice('')
+      }
+
+      recognition.onresult = (event) => {
+        let transcript = ''
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript
+        }
+        if (transcript) {
+          setPromptInput(prev => {
+            const trimmed = prev.trim()
+            return trimmed ? `${trimmed} ${transcript}` : transcript
+          })
+        }
+      }
+
+      recognition.onerror = (event) => {
+        if (event.error !== 'no-speech') {
+          setErrorNotice(`Microphone error: ${event.error}`)
+        }
+        setIsListening(false)
+      }
+
+      recognition.onend = () => {
+        setIsListening(false)
+      }
+
+      recognitionRef.current = recognition
+      recognition.start()
+    } catch (err) {
+      setErrorNotice('Failed to start microphone: ' + (err.message || 'Permission denied'))
+      setIsListening(false)
     }
   }
 
@@ -579,17 +656,35 @@ export default function App() {
               disabled={!hasAttachedResources || sendingMessage}
               placeholder={
                 hasAttachedResources
-                  ? 'Ask anything about your attached notes…'
+                  ? (isListening ? 'Listening… speak your question now…' : 'Ask anything about your attached notes…')
                   : 'Add resources first using "+" to enable chat…'
               }
               className="flex-1 bg-transparent px-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none disabled:cursor-not-allowed"
             />
 
+            {/* Microphone Voice Button */}
+            <button
+              type="button"
+              onClick={handleToggleSpeechRecognition}
+              disabled={!hasAttachedResources || sendingMessage}
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs ${
+                isListening
+                  ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-950'
+                  : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-indigo-700 dark:text-indigo-300'
+              }`}
+              title={isListening ? 'Stop listening' : 'Speak your question (Voice Input)'}
+              aria-label={isListening ? 'Stop microphone' : 'Start microphone'}
+            >
+              <span className="text-base leading-none">
+                {isListening ? '⏹️' : '🎙️'}
+              </span>
+            </button>
+
             {/* Rightmost Submit Button */}
             <button
               type="submit"
               disabled={!hasAttachedResources || !promptInput.trim() || sendingMessage}
-              className="w-10 h-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              className="w-10 h-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0"
               title="Send Message"
             >
               ➔

@@ -1,10 +1,16 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Mobile and Desktop Responsive Layout Optimized, Drawer Navigation & Credits Verified ✅
+Last updated: 2026-10-12 — Voice Speech-to-Text (Mic Input) Added for Chat Questions ✅
 
 ---
 
 ## ✅ Done
+
+### Voice Input (Speech-to-Text Dictation)
+- **Microphone Button**: Integrated voice input toggle directly inside the chat bar next to the send button in `frontend/src/App.jsx`.
+- **SpeechRecognition API**: Built with standard Web Speech API (`webkitSpeechRecognition` / `SpeechRecognition`) with fallback error messaging for unsupported browsers.
+- **Real-Time Transcription**: Live interim transcript capture that appends spoken text directly into `promptInput`.
+- **Dynamic Visual Feedback**: Active pulsing red recording indicator (`animate-pulse ring-4 ring-rose-200`) and placeholder update (`"Listening… speak your question now…"`) while recording.
 
 ### Responsive Mobile & Desktop Layout Optimization (EzLearn)
 - **Off-Canvas Navigation Drawer for Mobile**:

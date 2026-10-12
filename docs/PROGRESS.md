@@ -1,10 +1,16 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Netlify Configuration Removed (Vercel & Render Only) ✅
+Last updated: 2026-10-12 — Clickable Web Sources & Reference Links for External/Outlier Topics Added ✅
 
 ---
 
 ## ✅ Done
+
+### Web Sources & External Reference Citations (EzLearn)
+- **External Web Reference Links**:
+  - Whenever a question involves external web synthesis or is identified as an outlier topic, the backend prompts Gemini to return credible web references with direct URLs and titles (e.g. Wikipedia, MDN, GeeksforGeeks, Khan Academy, official documentation).
+  - The explanation card in `frontend/src/App.jsx` renders an **`🌐 External Web Sources Consulted`** section with interactive, clickable reference pills (`🔗 Article Title ↗`) opening in a new tab.
+  - Retains internal resource citations (`📄 Page X`) for attached PDFs and notes.
 
 ### Multi-Resource Synthesis & Outlier Topic Handling (EzLearn)
 - **Universal Multi-Resource Synthesis**:

@@ -404,6 +404,7 @@ Answer with valid JSON:
     # 1. Specifically tell user this is an outlier topic not present in their resources
     # 2. Give ONLY a single paragraph explanation
     # 3. DO NOT generate any simulation or quiz
+    # 4. Provide trusted web reference sources (titles + URLs)
     if is_outlier:
         outlier_exp_prompt = f"""The student asked about a topic that is NOT present in any of their attached study resources.
 STUDENT QUESTION: {prompt}
@@ -411,14 +412,19 @@ STUDENT QUESTION: {prompt}
 Provide a response adhering strictly to these rules:
 1) State clearly that this topic was not found in their attached study resources.
 2) Provide a single concise, clear explanation paragraph addressing their question directly.
-3) Do not write multiple sections, bulleted lists, simulations, or quiz questions. Just one clean, well-written paragraph.
+3) Provide 2-3 trusted web references or documentation sources (e.g., Wikipedia, MDN, GeeksforGeeks, Khan Academy, official docs).
+4) Do not write multiple sections, bulleted lists, simulations, or quiz questions. Just one clean, well-written paragraph.
 
 Respond with valid JSON:
 {{
   "topic": "{prompt}",
   "is_outlier": true,
   "notice": "This topic was not found in any of your attached study resources. Here is a brief overview to help you understand it:",
-  "paragraph_explanation": "Single paragraph concise explanation of the topic."
+  "paragraph_explanation": "Single paragraph concise explanation of the topic.",
+  "web_sources": [
+    {{"title": "Source or Article Name", "url": "https://..."}},
+    {{"title": "Source or Article Name", "url": "https://..."}}
+  ]
 }}
 """
         raw_outlier = generate(outlier_exp_prompt)
@@ -432,6 +438,10 @@ Respond with valid JSON:
 
         paragraph = outlier_data.get("paragraph_explanation") or f"This topic ('{prompt}') is not mentioned in any of your attached study resources. In general, {prompt} refers to a concept commonly explored in related fields, functioning as a foundational principle to help address specific problems."
         notice = outlier_data.get("notice") or "This topic was not found in any of your attached study resources. Here is a brief single-paragraph overview:"
+        web_sources = outlier_data.get("web_sources") or [
+            {"title": f"Wikipedia - {prompt}", "url": f"https://en.wikipedia.org/wiki/{prompt.replace(' ', '_')}"},
+            {"title": f"Google Search - {prompt}", "url": f"https://www.google.com/search?q={prompt.replace(' ', '+')}"}
+        ]
 
         explanation_data = {
             "topic": prompt,
@@ -442,6 +452,7 @@ Respond with valid JSON:
             "real_life_picture": None,
             "key_terms": [],
             "external_sources_used": True,
+            "web_sources": web_sources,
         }
 
         # Save record with NO simulation and NO quiz
@@ -488,6 +499,7 @@ Follow the Beginner Rule:
 2) Clear concept summary in 2-3 plain sentences.
 3) Structured explanation with key points drawn from the attached resources.
 4) Technical terms in English with plain definitions.
+5) If external web knowledge is synthesized ({used_external_web}), include 1-2 reliable web reference links.
 
 Respond with valid JSON:
 {{
@@ -498,7 +510,8 @@ Respond with valid JSON:
   "summary": "Plain 2-3 sentence summary",
   "body": "Detailed explanation synthesized from all attached resources",
   "key_terms": [{{"term": "Term", "meaning": "Meaning"}}],
-  "external_sources_used": {str(used_external_web).lower()}
+  "external_sources_used": {str(used_external_web).lower()},
+  "web_sources": [{{"title": "Source Name", "url": "https://..."}}]
 }}
 """
     raw_exp = generate(exp_prompt)

@@ -378,48 +378,70 @@ def send_chat_message(
         {"page": c.page, "snippet": c.snippet, "chunk_id": c.chunk_id} for c in relevant_chunks
     ]
 
-    # Check if the question is an outlier topic (not covered in any of the attached resources)
-    outlier_check_prompt = f"""You are analyzing a student query against their study materials.
+    # ── STEP 1: SCAN THE FILE(S) & IDENTIFY THEIR ACADEMIC CONTEXT ───────────────
+    # First, scan the attached file(s) to determine their subject, domain, core themes, and scope.
+    # Second, check whether the student's question fits into that context.
+    context_scan_prompt = f"""You are an educational curriculum and document analyzer.
+
+First, thoroughly scan the attached study resources/files and identify their exact academic context, subject domain, core topics, and boundaries.
+Second, determine whether the student's question fits within this established context.
+
 STUDENT QUESTION: {prompt}
 
-ATTACHED STUDY RESOURCES:
-{combined_notes[:6000]}
+ATTACHED STUDY RESOURCES (Files, notes, documents in this chat):
+{combined_notes[:7000]}
 
-Is the topic or question fundamentally covered or mentioned in ANY of the attached study resources?
-Answer with valid JSON:
+Rules:
+1. Define the exact academic context of the uploaded file(s) (e.g. "Computer Science / Data Structures - Stacks and Queues", "Chemistry - Chemical Bonding", "Indian History - Freedom Struggle").
+2. Context-fit check:
+   - "fits_context": true ONLY if the student's question is directly related to, belongs within, or logically fits the academic context/domain of the uploaded file(s).
+   - "fits_context": false if the question does NOT fit in the context of the file(s) (e.g. asking about unrelated topics, different subjects, general trivia, or off-topic queries).
+3. If fits_context is false, state clearly why it is outside the context of the file(s).
+
+Respond with valid JSON:
 {{
-  "is_outlier": true | false,
+  "file_context": {{
+    "domain": "Academic domain of the file (e.g., Computer Science - Data Structures)",
+    "core_topics": ["Topic 1", "Topic 2", "Topic 3"],
+    "summary": "1-sentence summary of the context of the uploaded file(s)"
+  }},
+  "fits_context": true | false,
   "confidence": 0.0 to 1.0,
-  "reason": "Brief reason why it is or is not an outlier"
+  "reason": "Why the question fits or does not fit the context of the file(s)"
 }}
 """
-    raw_check = generate(outlier_check_prompt)
-    is_outlier = False
+    raw_scan = generate(context_scan_prompt)
+    fits_context = True
+    file_context_info = {}
     try:
         from app.api.explain import _parse_ai_json
-        check_data = _parse_ai_json(raw_check, expected_type=dict)
-        if isinstance(check_data, dict):
-            is_outlier = bool(check_data.get("is_outlier", False))
+        scan_data = _parse_ai_json(raw_scan, expected_type=dict)
+        if isinstance(scan_data, dict):
+            fits_context = bool(scan_data.get("fits_context", True))
+            file_context_info = scan_data.get("file_context") or {}
     except Exception:
-        # Fallback heuristic: if no chunk matched above threshold and combined notes don't share keywords
-        is_outlier = len(relevant_chunks) == 0
+        # Fallback heuristic: check if any relevant chunks match above threshold
+        fits_context = len(relevant_chunks) > 0
 
-    # ── CASE A: OUTLIER TOPIC (NOT PRESENT IN SOURCES) ──────────────────────────
-    # If question is NOT in any of the resources:
-    # 1. Do NOT give answer to questions that are not present in sources.
-    # 2. Specifically inform user that topic was not found in attached materials.
-    # 3. DO NOT generate any simulation or quiz.
-    if is_outlier:
+    # ── CASE A: QUESTION DOES NOT FIT IN FILE CONTEXT ─────────────────────────
+    # Questions that do not fit in the context of the file MUST NOT be answered.
+    # Refuse strictly: no explanation body, no simulation, no quiz.
+    if not fits_context:
+        domain = file_context_info.get("domain") or "the uploaded study materials"
+        scope = file_context_info.get("summary") or ""
+
         notice = (
-            f"I cannot answer this question because '{prompt}' is not present in your attached study resources. "
-            "EzLearn answers questions strictly based on your uploaded notes and materials. "
-            "Please upload study materials covering this topic or ask a question related to your attached notes."
+            f"I cannot answer this question because it does not fit within the context of your uploaded file(s). "
+            f"Your uploaded material covers: '{domain}'. "
+            "EzLearn answers questions strictly within the context of your attached study resources. "
+            "Please ask a question related to this context or upload new materials covering your topic."
         )
 
         explanation_data = {
             "topic": prompt,
             "is_outlier": True,
             "outlier_notice": notice,
+            "file_context": domain,
             "body": None,
             "summary": None,
             "real_life_picture": None,
@@ -456,23 +478,33 @@ Answer with valid JSON:
             "is_outlier": True,
         }
 
-    # ── CASE B: COVERED IN RESOURCES ──────────────────────────────────────────
-    # Synthesize across ALL attached resources in this conversation
+    # ── CASE B: QUESTION FITS FILE CONTEXT ─────────────────────────────────────
+    # Synthesize across attached resources in this conversation.
+    # Web knowledge may ONLY be used based on that established context.
+    domain = file_context_info.get("domain") or "the uploaded study materials"
     used_external_web = len(relevant_chunks) == 0
 
-    # 3. Step 2: Generate Explanation
-    exp_prompt = f"""You are AI Study Companion. Answer the user prompt by thoroughly considering and synthesizing ALL attached study resources in this chat.
-USER PROMPT: {prompt}
+    # 3. Step 2: Generate Explanation grounded in file context
+    exp_prompt = f"""You are AI Study Companion. The student asked a question that fits within the verified context of their attached study file(s).
 
-ATTACHED RESOURCES IN THIS CHAT (Consider all):
-{combined_notes[:6000]}
+ESTABLISHED FILE CONTEXT:
+Domain: {domain}
+Summary: {file_context_info.get('summary', 'Uploaded study material')}
+Core Topics: {', '.join(file_context_info.get('core_topics', []))}
 
-Follow the Beginner Rule:
-1) Everyday real-life picture / physical analogy FIRST.
-2) Clear concept summary in 2-3 plain sentences.
-3) Structured explanation with key points drawn from the attached resources.
-4) Technical terms in English with plain definitions.
-5) If external web knowledge is synthesized ({used_external_web}), include 1-2 reliable web reference links.
+STUDENT QUESTION: {prompt}
+
+ATTACHED RESOURCES IN THIS CHAT (Primary Source):
+{combined_notes[:6500]}
+
+STRICT RULES:
+1. Primary Source: Ground your explanation primarily in the attached study resources.
+2. Web Knowledge Rule: If web knowledge is needed ({used_external_web}), use web knowledge BASED ONLY ON THE ESTABLISHED FILE CONTEXT ('{domain}'). Never wander into topics outside this context.
+3. Everyday real-life picture / physical analogy FIRST.
+4. Clear concept summary in 2-3 plain sentences.
+5. Structured explanation with key points drawn from the attached resources and in-context knowledge.
+6. Technical terms in English with plain definitions.
+7. Any external web sources provided must be reliable references strictly relevant to '{domain}'.
 
 Respond with valid JSON:
 {{
@@ -481,7 +513,7 @@ Respond with valid JSON:
   "topic_type": "analogy" | "comparison_table" | "worked_example" | "simulation",
   "real_life_picture": "Everyday physical picture",
   "summary": "Plain 2-3 sentence summary",
-  "body": "Detailed explanation synthesized from all attached resources",
+  "body": "Detailed explanation synthesized from the attached resources within this file context",
   "key_terms": [{{"term": "Term", "meaning": "Meaning"}}],
   "external_sources_used": {str(used_external_web).lower()},
   "web_sources": [{{"title": "Source Name", "url": "https://..."}}]

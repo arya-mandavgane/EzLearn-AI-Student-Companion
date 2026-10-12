@@ -742,7 +742,7 @@ export default function App() {
                       <h4 className="font-extrabold text-base text-gray-900 dark:text-gray-100 flex items-center gap-2">
                         {msg.explanation.is_outlier ? (
                           <>
-                            <span className="text-amber-500">⚠️</span> Question Not in Attached Resources
+                            <span className="text-amber-500">⚠️</span> Question Outside File Context
                           </>
                         ) : (
                           <>
@@ -752,22 +752,27 @@ export default function App() {
                       </h4>
                       {msg.explanation.is_outlier ? (
                         <span className="text-[10px] bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800 px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
-                          <span>🚫</span> Not Answered (Outlier)
+                          <span>🚫</span> Not Answered (Out of Context)
                         </span>
                       ) : msg.explanation.external_sources_used ? (
                         <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-full font-bold">
-                          🌐 Synthesized with External Web Knowledge
+                          🌐 Enriched with In-Context Web Knowledge
                         </span>
                       ) : null}
                     </div>
 
-                    {/* Outlier Notice */}
+                    {/* Outlier / Out of Context Notice */}
                     {msg.explanation.outlier_notice && (
                       <div className="p-4 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs text-amber-900 dark:text-amber-200 font-medium leading-relaxed flex items-start gap-3">
                         <span className="text-base shrink-0 leading-none">⚠️</span>
                         <div className="space-y-1">
-                          <p className="font-bold text-amber-950 dark:text-amber-100">Topic not covered in study materials</p>
+                          <p className="font-bold text-amber-950 dark:text-amber-100">Question not in context of uploaded file</p>
                           <p>{msg.explanation.outlier_notice}</p>
+                          {msg.explanation.file_context && (
+                            <div className="mt-2 p-2 rounded-xl bg-amber-100/70 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 text-[11px]">
+                              <span className="font-bold">Detected File Context:</span> {msg.explanation.file_context}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

@@ -1,10 +1,19 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Initial Load Welcome Back (Login/Register) Modal Added ✅
+Last updated: 2026-10-12 — Direct Chat Text Box Enabled, Quiz Feedback Removed & Visual Simulation Canvas Added ✅
 
 ---
 
 ## ✅ Done
+
+### Direct Question Typing & Visual Simulation Upgrades (EzLearn)
+- **Always-Enabled Chat Text Box**:
+  - Unlocked the question input box in `frontend/src/App.jsx` so students can directly type their question or topic at any time without mandatory pre-steps.
+  - Automatically initializes context if a student asks a question directly, while maintaining full support for adding PDFs, notes, photos, and voice recording via the `+` button.
+- **Removed Quiz Feedback Question**:
+  - Removed the *"Have thoughts or questions on this quiz?"* section from `frontend/src/components/TenQuestionQuiz.jsx` to keep the results screen clean, focused, and distraction-free.
+- **Enhanced Visual Simulation**:
+  - Overhauled `UniversalProcessSimulation` in `frontend/src/components/SimulationView.jsx` with an interactive, animated visual pipeline canvas featuring state nodes, flow connectors (`➔`), live step pulse badges, and dark grid aesthetics.
 
 ### Initial Load Authentication Check (EzLearn)
 - **Automatic Login / Register Prompt**:

@@ -8,8 +8,6 @@ export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAt
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [currentIdx, setCurrentIdx] = useState(0)
-  const [userComment, setUserComment] = useState('')
-  const [commentSent, setCommentSent] = useState(false)
 
   // If already attempted, lock into result review view (Attempt Once)
   const isLocked = Boolean(attemptResult)
@@ -160,31 +158,6 @@ export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAt
               )}
             </div>
           ))}
-        </div>
-
-        {/* Student Feedback Comments */}
-        <div className="pt-2 border-t dark:border-gray-700 space-y-2">
-          <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
-            💬 Have thoughts or questions on this quiz?
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={userComment}
-              onChange={e => setUserComment(e.target.value)}
-              placeholder="e.g. Question 4 was tricky or I need more details on LIFO..."
-              className="flex-1 border dark:border-gray-700 rounded-xl px-3 py-2 text-xs bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-            <button
-              onClick={() => { setCommentSent(true); setUserComment('') }}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold"
-            >
-              Send
-            </button>
-          </div>
-          {commentSent && (
-            <p className="text-[11px] text-emerald-600 font-bold">Thank you for your comments!</p>
-          )}
         </div>
       </div>
     )

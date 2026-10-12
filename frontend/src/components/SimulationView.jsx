@@ -991,22 +991,48 @@ function UniversalProcessSimulation({ plan, onBack }) {
         {currentStep.description}
       </div>
 
-      {/* Dynamic Elements Canvas */}
-      {items.length > 0 && (
-        <div className="p-4 bg-slate-50 dark:bg-gray-900 rounded-xl border dark:border-gray-700 flex flex-wrap items-center justify-center gap-2">
-          {items.map((it, idx) => {
-            const label = typeof it === 'string' ? it : it.label
+      {/* Dynamic Visual Simulation Pipeline Canvas */}
+      <div className="p-5 bg-gradient-to-br from-slate-900 via-gray-900 to-indigo-950 rounded-2xl border border-indigo-900/50 shadow-inner flex flex-col items-center justify-center min-h-[170px] space-y-4 relative overflow-hidden">
+        {/* Background circuit grid effect */}
+        <div className="absolute inset-0 bg-[radial-gradient(#4f46e5_1px,transparent_1px)] [background-size:16px_16px] opacity-20 pointer-events-none" />
+
+        <div className="text-[10px] font-black uppercase tracking-widest text-indigo-400/90 z-10 flex items-center gap-1.5 self-start">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+          <span>Active State Visualization • Phase {currentStepIdx + 1}</span>
+        </div>
+
+        {/* Visual Pipeline Nodes with Flow Connectors */}
+        <div className="w-full flex items-center justify-center gap-2 sm:gap-3 flex-wrap z-10 py-2">
+          {(items.length > 0 ? items : [currentStep.title || 'Process Stage']).map((it, idx) => {
+            const label = typeof it === 'string' ? it : it.label || `Node ${idx + 1}`
+            const isActive = idx === (currentStepIdx % Math.max(items.length, 1)) || items.length <= 1
             return (
-              <div
-                key={idx}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-sm transform hover:scale-105 transition-all"
-              >
-                {label}
-              </div>
+              <React.Fragment key={idx}>
+                {idx > 0 && (
+                  <div className="text-indigo-400/60 font-mono text-sm select-none flex items-center">
+                    <span className="animate-pulse">➔</span>
+                  </div>
+                )}
+                <div
+                  className={`px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition-all duration-300 flex items-center gap-2 ${
+                    isActive
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white ring-2 ring-indigo-400 scale-105 shadow-indigo-500/30'
+                      : 'bg-gray-800/90 text-gray-300 border border-gray-700/80 hover:bg-gray-700'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-300 animate-pulse' : 'bg-gray-500'}`} />
+                  <span className="tracking-tight">{label}</span>
+                </div>
+              </React.Fragment>
             )
           })}
         </div>
-      )}
+
+        {/* Live Step Insight Pill */}
+        <div className="z-10 bg-indigo-900/40 border border-indigo-500/30 px-3 py-1 rounded-full text-[11px] text-indigo-200 font-mono">
+          ⚡ {currentStep.title || `Phase ${currentStepIdx + 1}`} In Progress
+        </div>
+      </div>
 
       {/* Predict what happens next */}
       {prediction && (

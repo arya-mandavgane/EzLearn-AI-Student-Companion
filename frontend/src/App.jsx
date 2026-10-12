@@ -303,19 +303,24 @@ export default function App() {
     const text = promptInput.trim()
     if (!text || !activeConvId) return
 
-    // Enforce resources requirement
-    const hasResources = (currentConvData?.resources?.length || 0) > 0
-    if (!hasResources) {
-      setErrorNotice('⚠️ Please add at least one study resource (text, image, audio, or PDF) using the "+" button before chatting.')
-      setIsResourceModalOpen(true)
-      return
-    }
-
     setSendingMessage(true)
     setErrorNotice('')
     setPromptInput('')
 
     try {
+      // If user typed question without manual resources, auto-add initial topic note
+      const hasResources = (currentConvData?.resources?.length || 0) > 0
+      if (!hasResources) {
+        await fetch(`${API_URL}/api/chat/conversations/${activeConvId}/resources/text`, {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            title: `Study Topic: ${text.slice(0, 40)}`,
+            text: `Core student inquiry and study topic: ${text}. Provide complete coverage, intuitive explanation, real-world visual demonstration, and a comprehensive 10-question quiz.`,
+          }),
+        })
+      }
+
       const res = await fetch(`${API_URL}/api/chat/conversations/${activeConvId}/messages`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -831,20 +836,22 @@ export default function App() {
               type="text"
               value={promptInput}
               onChange={e => setPromptInput(e.target.value)}
-              disabled={!hasAttachedResources || sendingMessage}
+              disabled={sendingMessage}
               placeholder={
-                hasAttachedResources
-                  ? (isListening ? 'Listening… speak your question now…' : 'Ask anything about your attached notes…')
-                  : 'Add resources first using "+" to enable chat…'
+                isListening
+                  ? 'Listening… speak your question now…'
+                  : hasAttachedResources
+                  ? 'Ask anything about your study notes…'
+                  : 'Type your study question or topic here…'
               }
-              className="flex-1 bg-transparent px-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none disabled:cursor-not-allowed"
+              className="flex-1 bg-transparent px-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
             />
 
             {/* Microphone Voice Button */}
             <button
               type="button"
               onClick={handleToggleSpeechRecognition}
-              disabled={!hasAttachedResources || sendingMessage}
+              disabled={sendingMessage}
               className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs ${
                 isListening
                   ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-950'
@@ -861,7 +868,7 @@ export default function App() {
             {/* Rightmost Submit Button */}
             <button
               type="submit"
-              disabled={!hasAttachedResources || !promptInput.trim() || sendingMessage}
+              disabled={!promptInput.trim() || sendingMessage}
               className="w-10 h-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shrink-0"
               title="Send Message"
             >
@@ -870,8 +877,8 @@ export default function App() {
           </form>
 
           {!hasAttachedResources && (
-            <p className="text-center text-[11px] text-amber-600 dark:text-amber-400 font-medium mt-1.5">
-              ⚠️ Strict Study Resource Rule: Click <strong>+</strong> to add study notes before typing.
+            <p className="text-center text-[11px] text-indigo-600 dark:text-indigo-400 font-medium mt-1.5 flex items-center justify-center gap-1">
+              <span>💡 Tip:</span> Type your question or click <strong>+</strong> to attach PDFs, photos, audio, or notes.
             </p>
           )}
 

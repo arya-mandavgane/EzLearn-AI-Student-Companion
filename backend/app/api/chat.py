@@ -394,6 +394,9 @@ def send_chat_message(
         "give", "write", "define", "summary", "notes", "question", "answer", "please",
         "show", "state", "find", "calculate", "list", "name", "help", "solve", "detail",
         "provide", "information", "info", "discuss", "view", "know", "check", "need",
+        "simple", "terms", "words", "understand", "short", "long", "easy", "basic",
+        "main", "first", "second", "best", "different", "used", "use", "using", "make",
+        "like", "good", "right", "way", "point", "well", "also", "mean", "meaning",
         # Generic academic terms that appear in all disciplines
         "formula", "theorem", "theory", "law", "rule", "definition", "concept",
         "principle", "problem", "solution", "example", "method", "system", "type",
@@ -520,31 +523,41 @@ Respond ONLY with valid JSON:
     domain = notes_domain
 
     # 3. Step 2: Generate Explanation strictly grounded in the attached materials
-    exp_prompt = f"""You are AI Study Companion. The student asked a question about their attached study notes ({domain}).
+    exp_prompt = f"""You are AI Study Companion. A student uploaded study notes on {domain} and asked a question.
 
-STUDENT QUESTION: {prompt}
+STUDENT QUESTION:
+{prompt}
 
-ATTACHED RESOURCES IN THIS CHAT (Exclusive Source of Truth):
+STUDENT'S UPLOADED STUDY NOTES (Your ONLY allowed source of information):
 {combined_notes[:7000]}
 
-STRICT GROUNDING RULES:
-1. Exclusive Source of Truth: Answer SOLELY using the content and concepts in the attached resources above.
-2. If the concept asked in the question is NOT present or taught in the attached resources above (e.g. asking for Pythagoras Theorem on Computer Science notes), you MUST set "is_outlier": true and "body": null. Do NOT answer from external general knowledge.
-3. Everyday real-life picture / physical analogy FIRST.
-4. Clear concept summary in 2-3 plain sentences.
-5. Structured explanation with key points drawn directly from the attached resources.
-6. Technical terms in English with plain definitions found in the notes.
+STRICT GROUNDING DIRECTIVE:
+You are an extractive and synthesized grounding engine. You are STRICTLY FORBIDDEN from using any pre-trained external knowledge.
+1. Scan the STUDENT'S UPLOADED STUDY NOTES above.
+2. Does the uploaded text explicitly define, explain, or answer the student's question ('{prompt}')?
+   - If NO (the concept or question is outside the uploaded notes, such as asking about geometry/theorems/formulas/topics not mentioned in the text):
+     You MUST return EXACTLY this JSON:
+     {{
+       "topic": "{prompt}",
+       "is_outlier": true,
+       "body": null,
+       "summary": null,
+       "real_life_picture": null,
+       "key_terms": []
+     }}
+   - If YES (the concept is explicitly covered in the text):
+     Return the explanation strictly synthesized from the text:
+     {{
+       "topic": "Specific Topic from Notes",
+       "is_outlier": false,
+       "topic_type": "analogy",
+       "real_life_picture": "Analogy based on notes",
+       "summary": "Summary based strictly on notes",
+       "body": "Detailed explanation based strictly on the uploaded study notes",
+       "key_terms": [{{"term": "Term", "meaning": "Meaning"}}]
+     }}
 
-Respond with valid JSON:
-{{
-  "topic": "Main Topic",
-  "is_outlier": false,
-  "topic_type": "analogy" | "comparison_table" | "worked_example" | "simulation",
-  "real_life_picture": "Everyday physical picture",
-  "summary": "Plain 2-3 sentence summary",
-  "body": "Detailed explanation synthesized purely from the attached study resources",
-  "key_terms": [{{"term": "Term", "meaning": "Meaning"}}]
-}}
+Respond ONLY with valid JSON.
 """
     raw_exp = generate(exp_prompt)
     try:

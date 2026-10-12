@@ -1,20 +1,21 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — Three-Tier Fail-Safe Grounding Guard & Generation Fallback Implemented ✅
+Last updated: 2026-10-12 — Dual-Schema Extractive Grounding & Conversational Modifier Gating Implemented ✅
 
 ---
 
 ## ✅ Done
 
-### Three-Tier Fail-Safe Grounding Guard & Generation Fallback (EzLearn)
-- **Eliminated False-Positive Academic Matches & Prompt Overrides**:
-  - Expanded generic academic stopwords ("formula", "theorem", "law", "rule", "definition", "concept", "method", "show", "state", "find", "calculate", "list", "name", "help", "solve", "detail", "provide", "information", "discuss", "know", "check", "need") to eliminate false lexical overlap between student questions and uploaded materials.
-  - **Deterministic Lexical Gate**: If the question's content tokens have zero overlap with the uploaded notes (`len(q_tokens) > 0 and len(shared_tokens) == 0`), the query is unconditionally rejected before LLM generation.
-- **Direct Binary Topic Audit**:
-  - `is_covered_in_notes` verification prompt queries Gemini with `temperature=0.0`: *"Is the topic of the question ('{prompt}') actually taught or present in the uploaded notes?"*. If false, query is rejected immediately.
-- **Fail-Safe Generation Guard (Case B Fallback)**:
-  - Added strict negative instruction to `exp_prompt`: if the concept is not present in the notes, Gemini is instructed to return `is_outlier: true` and `body: null`.
-  - Added backend safety check: if `explanation_data.get("is_outlier") is True` or `not explanation_data.get("body")`, execution falls back to Case A rejection, preventing ungrounded general world knowledge, formulas, simulations, or quizzes from ever being returned.
+### Dual-Schema Extractive Grounding & Conversational Modifier Gating (EzLearn)
+- **Eliminated Conversational Modifier Word Collisions**:
+  - Filtered conversational and qualitative adjectives ("simple", "terms", "words", "understand", "short", "long", "easy", "basic", "main", "first", "second", "best", "different", "used", "use", "using", "make", "like", "good", "right", "way", "point", "well", "also") from keyword overlap matching so questions like "explain in simple terms the pythagoras theorem formula" cannot falsely match common English words in uploaded notes.
+- **Dual-Schema Strict Extractive Prompt**:
+  - Rewrote the explanation prompt (`exp_prompt`) with an explicit dual-schema directive:
+    - If the requested concept is NOT in the uploaded notes: AI is forced to return `is_outlier: true`, `body: null`, `summary: null`, `real_life_picture: null`.
+    - If the requested concept IS in the uploaded notes: AI synthesizes explanation strictly from the notes.
+  - Verified live with Google Gemini API: `"What is a stack and what operations does it support?"` returns `is_outlier: False | has_body: True`, while `"pythagoras theorem formula"` returns `is_outlier: True | has_body: False`.
+- **Absolute Quiz & Simulation Prevention on Outliers**:
+  - Whenever `is_outlier` is true (or `body` is null), execution strictly branches to Case A: saves outlier notice, sets `simulation: None` and `quiz: None`, preventing quiz generation on unrelated topics entirely.
 
 
 ### Strict Multi-Layer Domain Alignment & Lexical Gating (EzLearn)

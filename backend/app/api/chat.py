@@ -637,37 +637,57 @@ Respond ONLY with valid JSON.
 
     # 4. Step 3: Demonstration / Simulation Plan (Single unified view showing all parts)
     topic_name = explanation_data.get("topic") or prompt
-    sim_prompt = f"""Design a visual single-phase process diagram / interactive demonstration for: '{topic_name}' within the academic context of '{domain}'.
-Instead of multi-phase step navigation or paging, design a comprehensive single-phase view showing all its interconnected parts/components clearly.
-Return valid JSON:
+    summary_text = explanation_data.get("summary") or ""
+    analogy_text = explanation_data.get("analogy") or ""
+
+    sim_prompt = f"""You are an expert educational visualizer.
+The student asked: "{prompt}"
+The system explained the topic: "{topic_name}" (Domain: {domain}).
+Summary of explanation: "{summary_text}"
+
+Design an interactive, concept-specific process diagram / demonstration directly modeling: "{topic_name}".
+The simulation components and steps must precisely reflect the actual mechanism, stages, or architecture of what was asked and explained above.
+Do NOT output generic placeholders, and do NOT use unrelated templates like Stack or Queue unless the concept itself is literally a Stack or Queue.
+
+Return a valid JSON object strictly matching this schema:
 {{
-  "template": "process" | "stack" | "queue" | "sorting",
-  "title": "Interactive Process Demonstration: {topic_name}",
-  "intro": "1-2 sentences introducing the entire system and how all components operate together in a single unified process.",
+  "template": "process",
+  "title": "{topic_name} Process Demonstration",
+  "intro": "2 sentences explaining how this specific process or concept operates from start to finish.",
+  "analogy": "{analogy_text or 'Everyday real-world intuition for this concept'}",
   "parts": [
-    {{"id": 1, "name": "Part / Component 1", "role": "Specific role or function in this process", "details": "Detailed explanation of how this part operates."}},
-    {{"id": 2, "name": "Part / Component 2", "role": "Specific role or function in this process", "details": "Detailed explanation of how this part operates."}},
-    {{"id": 3, "name": "Part / Component 3", "role": "Specific role or function in this process", "details": "Detailed explanation of how this part operates."}}
+    {{"id": 1, "name": "Exact Name of Phase / Step / Component 1", "role": "Specific role in {topic_name}", "details": "Detailed explanation of what occurs in this phase."}},
+    {{"id": 2, "name": "Exact Name of Phase / Step / Component 2", "role": "Specific role in {topic_name}", "details": "Detailed explanation of what occurs in this phase."}},
+    {{"id": 3, "name": "Exact Name of Phase / Step / Component 3", "role": "Specific role in {topic_name}", "details": "Detailed explanation of what occurs in this phase."}}
   ],
-  "analogy": "Everyday analogy explaining this process."
+  "prediction": {{
+    "question": "Concept check question testing understanding of this process",
+    "options": ["Correct choice", "Incorrect choice 1", "Incorrect choice 2"],
+    "correct_index": 0,
+    "explanation": "Why this option is correct based on the process."
+  }}
 }}
-"""
+Return ONLY valid JSON (no markdown, no extra commentary)."""
+
     raw_sim = generate(sim_prompt)
     simulation_data = None
     try:
         from app.api.explain import _parse_ai_json
         simulation_data = _parse_ai_json(raw_sim, expected_type=dict)
+        # Ensure template is 'process' so it never falls into stack/queue plates or lines
+        if isinstance(simulation_data, dict):
+            simulation_data["template"] = "process"
     except Exception:
         simulation_data = {
             "template": "process",
-            "title": f"Process Map: {topic_name}",
-            "intro": f"Single comprehensive visual view of {topic_name} displaying all its interconnected parts simultaneously.",
+            "title": f"{topic_name} Process Demonstration",
+            "intro": f"Interactive structural demonstration of {topic_name} showing how its key components operate in sequence.",
             "parts": [
-                {"id": 1, "name": "Input / Ingestion", "role": "Receives raw data, signals, or stimulus", "details": "The entry boundary where inputs are captured and validated."},
-                {"id": 2, "name": "Core Processing", "role": "Applies rules, algorithms, or transformations", "details": "Processes and computes state changes across the system."},
-                {"id": 3, "name": "Output & Resolution", "role": "Delivers formatted results or final state", "details": "The final stage producing actionable outputs and persisting results."}
+                {"id": 1, "name": f"{topic_name} Initiation", "role": "Input criteria and initial conditions", "details": f"Sets up the requirements and starting parameters for {topic_name}."},
+                {"id": 2, "name": f"{topic_name} Execution", "role": "Core transformation and processing", "details": f"Applies the fundamental principles and logic of {topic_name}."},
+                {"id": 3, "name": f"{topic_name} Verification", "role": "Validation and state resolution", "details": f"Confirms constraints, outputs, and terminal criteria of {topic_name}."}
             ],
-            "analogy": "A factory assembly line turning raw inputs into completed products.",
+            "analogy": analogy_text or f"A structured workflow coordinating all elements of {topic_name}.",
         }
 
     # 5. Step 4: Generate 5-Question Quiz focused specifically on the student's asked topic/query
@@ -735,6 +755,13 @@ def submit_chat_quiz(
     msg = db.query(MessageRecord).filter(MessageRecord.id == msg_id).first()
     if not msg:
         raise HTTPException(status_code=404, detail="Message not found.")
+
+    # Link conversation to user if signed in
+    if current_user:
+        conv = db.query(ConversationRecord).filter(ConversationRecord.id == conv_id).first()
+        if conv and not conv.user_id:
+            conv.user_id = current_user.id
+            db.commit()
 
     # Check if already attempted (Attempt Once constraint)
     if msg.quiz_attempt_json:
@@ -832,43 +859,63 @@ Give 2-3 concise, encouraging AI pedagogical suggestions:
 
 
 # ── Analytics: Daily / Weekly / Monthly Reports ───────────────────────────────
+from sqlalchemy import or_
 
 @router.get("/reports/{timeframe}")
 def get_performance_report(
     timeframe: str,  # "daily", "weekly", "monthly"
+    conv_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     Computes user accuracy, weakness, strengths, and must-do topics
-    aggregated over Daily, Weekly, or Monthly periods for the signed-in user.
+    aggregated over Daily, Weekly, or Monthly periods for the signed-in user or active session.
     """
-    if not current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Performance reports are available only for registered and signed-in students.",
-        )
-
     now = datetime.now(timezone.utc)
+    now_naive = now.replace(tzinfo=None)
     if timeframe == "daily":
         start_date = now - timedelta(days=1)
+        start_date_naive = now_naive - timedelta(days=1)
         period_label = "Past 24 Hours"
     elif timeframe == "weekly":
         start_date = now - timedelta(days=7)
+        start_date_naive = now_naive - timedelta(days=7)
         period_label = "Past 7 Days"
     elif timeframe == "monthly":
         start_date = now - timedelta(days=30)
+        start_date_naive = now_naive - timedelta(days=30)
         period_label = "Past 30 Days"
     else:
         raise HTTPException(status_code=400, detail="Invalid timeframe. Use 'daily', 'weekly', or 'monthly'.")
 
-    # Query all messages with quiz attempts within period
-    q = db.query(MessageRecord).join(ConversationRecord).filter(
+    # In SQLite, MessageRecord.created_at might be naive. Match either aware or naive UTC.
+    date_filter = or_(
         MessageRecord.created_at >= start_date,
+        MessageRecord.created_at >= start_date_naive,
+    )
+
+    q = db.query(MessageRecord).join(ConversationRecord).filter(
+        date_filter,
         MessageRecord.quiz_attempt_json.isnot(None),
     )
+
     if current_user:
-        q = q.filter(ConversationRecord.user_id == current_user.id)
+        # If user is logged in, link active conv if unlinked and query user's conversations
+        if conv_id:
+            active_c = db.query(ConversationRecord).filter(ConversationRecord.id == conv_id).first()
+            if active_c and not active_c.user_id:
+                active_c.user_id = current_user.id
+                db.commit()
+            q = q.filter(or_(ConversationRecord.user_id == current_user.id, ConversationRecord.id == conv_id))
+        else:
+            q = q.filter(ConversationRecord.user_id == current_user.id)
+    elif conv_id:
+        # Guest user querying their current study session conversation
+        q = q.filter(ConversationRecord.id == conv_id)
+    else:
+        # Guest fallback: recent guest conversations
+        q = q.filter(ConversationRecord.user_id.is_(None))
 
     messages = q.all()
 
@@ -901,15 +948,18 @@ def get_performance_report(
 
     for t, st in topic_stats.items():
         acc = (st["correct"] / max(st["total"], 1)) * 100
-        if acc >= 75.0 and st["total"] >= 2:
+        if acc >= 70.0 and st["total"] >= 1:
             strengths.append({"topic": t, "accuracy": round(acc, 1), "tested": st["total"]})
-        elif acc < 60.0:
+        else:
             weaknesses.append({"topic": t, "accuracy": round(acc, 1), "tested": st["total"]})
             must_do_topics.append(t)
 
-    # If no tested weaknesses, pick from recent topics
+    # If all tested topics scored high, suggest the ones with lower relative accuracy
     if not must_do_topics:
-        must_do_topics = list(topic_stats.keys())[:3]
+        sorted_strengths = sorted(strengths, key=lambda x: x["accuracy"])
+        must_do_topics = [s["topic"] for s in sorted_strengths][:2]
+        if not must_do_topics:
+            must_do_topics = list(topic_stats.keys())[:2]
 
     return {
         "timeframe": timeframe,

@@ -82,6 +82,18 @@ export default function App() {
   const [isResourceModalOpen, setIsResourceModalOpen] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  const [reportRefreshKey, setReportRefreshKey] = useState(0)
+
+  function handleQuizSubmitted(msgId, attempt, suggestions) {
+    setCurrentConvData(prev => {
+      if (!prev || !prev.messages) return prev
+      return {
+        ...prev,
+        messages: prev.messages.map(m => m.id === msgId ? { ...m, quiz_attempt: attempt, ai_suggestions: suggestions } : m),
+      }
+    })
+    setReportRefreshKey(k => k + 1)
+  }
   // Backend Health & Auto Wake-up State: 'checking' | 'online' | 'offline' | 'waking'
   const [backendStatus, setBackendStatus] = useState('checking') // 'checking' | 'online' | 'offline' | 'waking'
   const [isWakingUp, setIsWakingUp] = useState(false)
@@ -482,6 +494,7 @@ export default function App() {
         onOpenAuth={() => setIsAuthOpen(true)}
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
+        reportRefreshKey={reportRefreshKey}
       />
 
       {/* ── Main Chat Area ── */}
@@ -862,6 +875,7 @@ export default function App() {
                     apiUrl={API_URL}
                     initialAttempt={msg.quiz_attempt}
                     initialSuggestions={msg.ai_suggestions}
+                    onQuizSubmitted={handleQuizSubmitted}
                   />
                 )}
 

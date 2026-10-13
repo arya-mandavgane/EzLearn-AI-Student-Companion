@@ -1,10 +1,22 @@
 # PROGRESS
 
-Last updated: 2026-10-12 — 5-Question Topic-Focused Knowledge Check Quiz ✅
+Last updated: 2026-10-13 — Dynamic Concept Simulations & Real-Time Performance Reports Update ✅
 
 ---
 
 ## ✅ Done
+
+### Concept-Tailored Process Simulations & Live Performance Reports (EzLearn)
+- **Concept-Tailored Demonstrations (`backend/app/api/chat.py`, `frontend/src/components/SimulationView.jsx`)**:
+  - Eliminated arbitrary Stack and Queue template selection. The simulation prompt now takes both what the student asked (`prompt`) and what the software answered (`explanation_summary`, `explanation_body`, `analogy`), modeling the exact architecture and stages of the asked concept.
+  - Generates 3 to 5 named sequential stages specifically matching the topic (e.g. for Waterfall: Requirements, Design, Implementation, Verification; for Photosynthesis: Light Absorption, Electron Transport, Calvin Cycle).
+  - Gated dedicated Stack/Queue graphical visualizers in `ProcessSimulationView`: they now ONLY render if the concept is genuinely about a Stack or Queue data structure. All other topics render the interactive `UniversalProcessSimulation` with animated flow execution and prediction check.
+- **Real-Time Daily, Weekly & Monthly Performance Reports (`backend/app/api/chat.py`, `frontend/src/App.jsx`, `frontend/src/components/Sidebar.jsx`, `frontend/src/components/TenQuestionQuiz.jsx`)**:
+  - **Live Auto-Refresh**: Added `onQuizSubmitted` callback in `TenQuestionQuiz` triggering `reportRefreshKey` in `App.jsx`. Submitting any quiz automatically reloads the open report card in `Sidebar` immediately.
+  - **Session & Guest Support**: Enhanced `/api/chat/reports/{timeframe}` to accept `conv_id`. Both logged-in students and guest session learners can now view and track active performance metrics without encountering 401 locks.
+  - **SQLite Datetime Compatibility**: Handled both naive and timezone-aware timestamps in `MessageRecord.created_at` comparisons so queries accurately match past 24h, 7d, and 30d periods.
+  - **Accurate Topic Statistics & UI Metrics**: Relaxed threshold logic (`st['total'] >= 1`) so that every tested topic is appropriately identified as a strength ($\ge 70\%$) or weakness/must-do revision topic ($< 70\%$). The Sidebar now displays Quizzes Completed, Questions Solved, and Overall Accuracy with a 🔄 manual refresh button.
+
 
 ### 5-Question Topic-Focused Knowledge Check Quiz (EzLearn)
 - **All 5 Questions Converted to Multiple Choice (MCQs) (`backend/app/api/quiz.py`)**:

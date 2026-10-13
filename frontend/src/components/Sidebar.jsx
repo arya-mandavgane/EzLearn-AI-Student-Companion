@@ -11,24 +11,28 @@ export function Sidebar({
   onOpenAuth,
   isOpen = false,
   onClose,
+  reportRefreshKey,
 }) {
   const [activeReportTab, setActiveReportTab] = useState(null) // 'daily' | 'weekly' | 'monthly' | null
   const [reportData, setReportData] = useState(null)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
 
-  async function loadReport(timeframe) {
-    if (!currentUser) {
-      if (onOpenAuth) onOpenAuth()
-      return
+  // Auto-reload report when a quiz is submitted
+  useEffect(() => {
+    if (activeReportTab) {
+      loadReport(activeReportTab, true)
     }
+  }, [reportRefreshKey])
 
-    if (activeReportTab === timeframe) {
+  async function loadReport(timeframe, isAutoRefresh = false) {
+    if (!isAutoRefresh && activeReportTab === timeframe) {
       setActiveReportTab(null)
       setReportData(null)
       setReportError('')
       return
     }
+
     setActiveReportTab(timeframe)
     setReportLoading(true)
     setReportError('')
@@ -37,7 +41,8 @@ export function Sidebar({
       const headers = {}
       if (token) headers['Authorization'] = `Bearer ${token}`
 
-      const res = await fetch(`${apiUrl}/api/chat/reports/${timeframe}`, { headers })
+      const convQuery = activeConvId ? `?conv_id=${encodeURIComponent(activeConvId)}` : ''
+      const res = await fetch(`${apiUrl}/api/chat/reports/${timeframe}${convQuery}`, { headers })
       const data = await res.json()
       if (!res.ok) {
         setReportError(data.detail || 'Could not load report.')
@@ -120,11 +125,9 @@ export function Sidebar({
             <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-500 tracking-wider">
               Performance Reports
             </span>
-            {!currentUser && (
-              <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400">
-                🔒 Registered Only
-              </span>
-            )}
+            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+              Live Analytics
+            </span>
           </div>
           <div className="grid grid-cols-3 gap-1">
             {[
@@ -140,7 +143,7 @@ export function Sidebar({
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
-                title={!currentUser ? 'Sign in to access analytics reports' : `View ${tier.id} report`}
+                title={`View ${tier.id} performance report`}
               >
                 {tier.label}
               </button>
@@ -164,55 +167,99 @@ export function Sidebar({
       {activeReportTab && (
         <div className="p-3 bg-indigo-50/50 dark:bg-indigo-950/30 border-b border-indigo-100 dark:border-indigo-900 space-y-2 text-xs animate-fadeIn">
           <div className="flex items-center justify-between font-bold text-indigo-900 dark:text-indigo-200">
-            <span className="capitalize">{activeReportTab} Report</span>
-            <button onClick={() => setActiveReportTab(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            <span className="capitalize">{activeReportTab} Report ({reportData?.period_label || 'Current'})</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => loadReport(activeReportTab, true)}
+                className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-0.5"
+                title="Refresh report metrics"
+              >
+                🔄
+              </button>
+              <button onClick={() => setActiveReportTab(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                ✕
+              </button>
+            </div>
           </div>
 
           {reportLoading && <p className="text-[11px] text-gray-400">Loading metrics…</p>}
 
+          {reportError && (
+            <p className="text-[11px] text-rose-500 font-medium">{reportError}</p>
+          )}
+
           {reportData && (
             <div className="space-y-2">
-              <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-2 rounded-xl border dark:border-gray-700">
-                <span className="text-[11px] text-gray-500">Overall Accuracy:</span>
-                <span className="font-black text-indigo-600 dark:text-indigo-400">
-                  {reportData.overall_accuracy_pct}%
-                </span>
+              <div className="grid grid-cols-3 gap-1 text-center">
+                <div className="bg-white dark:bg-gray-800 p-1.5 rounded-xl border dark:border-gray-700">
+                  <span className="text-[9px] uppercase font-bold text-gray-400 block">Accuracy</span>
+                  <span className="font-black text-xs text-indigo-600 dark:text-indigo-400">
+                    {reportData.overall_accuracy_pct}%
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-1.5 rounded-xl border dark:border-gray-700">
+                  <span className="text-[9px] uppercase font-bold text-gray-400 block">Quizzes</span>
+                  <span className="font-bold text-xs text-gray-700 dark:text-gray-200">
+                    {reportData.quizzes_completed}
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-1.5 rounded-xl border dark:border-gray-700">
+                  <span className="text-[9px] uppercase font-bold text-gray-400 block">Questions</span>
+                  <span className="font-bold text-xs text-gray-700 dark:text-gray-200">
+                    {reportData.total_questions_answered}
+                  </span>
+                </div>
               </div>
 
-              {/* Strengths */}
-              {reportData.strengths?.length > 0 && (
-                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-800">
-                  <span className="font-bold text-[10px] uppercase text-emerald-800 dark:text-emerald-300 block">
-                    💪 Strengths:
-                  </span>
-                  <div className="text-[11px] text-emerald-900 dark:text-emerald-200 truncate">
-                    {reportData.strengths.map(s => s.topic).join(', ')}
-                  </div>
+              {reportData.quizzes_completed === 0 ? (
+                <div className="p-2.5 bg-white dark:bg-gray-800/80 rounded-xl border dark:border-gray-700 text-center text-gray-400">
+                  <p className="text-[11px]">No quizzes completed in this period yet.</p>
+                  <p className="text-[10px] mt-0.5 text-indigo-500">Take a 5-question quiz to see your live metrics!</p>
                 </div>
+              ) : (
+                <>
+                  {/* Strengths */}
+                  {reportData.strengths?.length > 0 && (
+                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                      <span className="font-bold text-[10px] uppercase text-emerald-800 dark:text-emerald-300 block">
+                        💪 Strengths:
+                      </span>
+                      <div className="text-[11px] text-emerald-900 dark:text-emerald-200 truncate">
+                        {reportData.strengths.map(s => s.topic).join(', ')}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Weaknesses */}
+                  {reportData.weaknesses?.length > 0 && (
+                    <div className="p-2 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-800">
+                      <span className="font-bold text-[10px] uppercase text-rose-800 dark:text-rose-300 block">
+                        ⚠️ Needs Attention:
+                      </span>
+                      <div className="text-[11px] text-rose-900 dark:text-rose-200 truncate">
+                        {reportData.weaknesses.map(w => w.topic).join(', ')}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Must-do Topics */}
+                  {reportData.must_do_topics?.length > 0 && (
+                    <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800">
+                      <span className="font-bold text-[10px] uppercase text-amber-800 dark:text-amber-300 block">
+                        🎯 Must-Do Topics:
+                      </span>
+                      <div className="text-[11px] text-amber-900 dark:text-amber-200">
+                        {reportData.must_do_topics.join(', ')}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Weaknesses */}
-              {reportData.weaknesses?.length > 0 && (
-                <div className="p-2 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-800">
-                  <span className="font-bold text-[10px] uppercase text-rose-800 dark:text-rose-300 block">
-                    ⚠️ Needs Attention:
-                  </span>
-                  <div className="text-[11px] text-rose-900 dark:text-rose-200 truncate">
-                    {reportData.weaknesses.map(w => w.topic).join(', ')}
-                  </div>
-                </div>
-              )}
-
-              {/* Must-do Topics */}
-              {reportData.must_do_topics?.length > 0 && (
-                <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800">
-                  <span className="font-bold text-[10px] uppercase text-amber-800 dark:text-amber-300 block">
-                    🎯 Must-Do Topics:
-                  </span>
-                  <div className="text-[11px] text-amber-900 dark:text-amber-200">
-                    {reportData.must_do_topics.join(', ')}
-                  </div>
-                </div>
+              {!currentUser && (
+                <p className="text-[10px] text-indigo-500 dark:text-indigo-400 text-center cursor-pointer hover:underline pt-1" onClick={onOpenAuth}>
+                  💡 Sign in to save progress permanently
+                </p>
               )}
             </div>
           )}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 
-export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAttempt, initialSuggestions }) {
+export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAttempt, initialSuggestions, onQuizSubmitted }) {
   const questions = quizData?.questions || []
   const [answers, setAnswers] = useState({}) // { [qId]: option }
   const [attemptResult, setAttemptResult] = useState(initialAttempt || null)
@@ -46,6 +46,9 @@ export function TenQuestionQuiz({ quizData, messageId, convId, apiUrl, initialAt
       } else {
         setAttemptResult(data.quiz_attempt)
         setAiSuggestions(data.ai_suggestions)
+        if (onQuizSubmitted) {
+          onQuizSubmitted(messageId, data.quiz_attempt, data.ai_suggestions)
+        }
       }
     } catch {
       setError('Network error while scoring quiz.')

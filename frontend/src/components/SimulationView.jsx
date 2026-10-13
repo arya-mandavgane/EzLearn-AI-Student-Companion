@@ -890,18 +890,24 @@ export function SortingSimulation({ onBack }) {
  */
 export function ProcessSimulationView({ plan, onBack }) {
   const template = plan?.template?.toLowerCase() || 'process'
+  const title = (plan?.title || '').toLowerCase()
+  const intro = (plan?.intro || '').toLowerCase()
 
-  if (template === 'stack') {
+  // Dedicated Stack/Queue graphical widget is ONLY used if the simulation is genuinely about Stack or Queue
+  const isDedicatedStack = template === 'stack' && (title.includes('stack') || intro.includes('stack') || intro.includes('lifo'))
+  const isDedicatedQueue = template === 'queue' && (title.includes('queue') || intro.includes('queue') || intro.includes('fifo'))
+
+  if (isDedicatedStack) {
     return <StackSimulation onBack={onBack} />
   }
-  if (template === 'queue') {
+  if (isDedicatedQueue) {
     return <QueueSimulation onBack={onBack} />
   }
-  if (template === 'sorting') {
+  if (template === 'sorting' && (title.includes('sort') || intro.includes('sort'))) {
     return <SortingSimulation onBack={onBack} />
   }
 
-  // Universal Process Simulation for all other topics
+  // Universal Process Simulation tailored directly to what the student asked and what the software answered
   return <UniversalProcessSimulation plan={plan} onBack={onBack} />
 }
 

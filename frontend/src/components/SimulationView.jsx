@@ -1012,42 +1012,44 @@ function UniversalProcessSimulation({ plan, onBack }) {
           </button>
         </div>
 
-        {/* Visual interconnected nodes in single view */}
-        <div className="w-full flex items-center justify-start sm:justify-center gap-2 sm:gap-3 overflow-x-auto py-3 z-10 relative">
-          {parts.map((p, idx) => {
-            const isSelected = p.id === activePartId
-            return (
-              <React.Fragment key={p.id}>
-                {idx > 0 && (
-                  <div className="text-indigo-400/80 font-mono text-base select-none shrink-0 flex items-center px-0.5">
-                    <span className={isSimulatingFlow ? 'animate-pulse text-indigo-300 font-bold' : ''}>➔</span>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setActivePartId(p.id)}
-                  className={`group px-3.5 py-2.5 rounded-2xl text-left font-bold text-xs shadow-md transition-all duration-300 shrink-0 border cursor-pointer ${
-                    isSelected
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white border-indigo-400 ring-2 ring-indigo-400/60 scale-105 shadow-indigo-500/40'
-                      : 'bg-gray-800/90 text-gray-200 border-gray-700/80 hover:bg-gray-750 hover:border-indigo-500/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-black uppercase tracking-wider ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-indigo-950 text-indigo-300 border border-indigo-800'
-                    }`}>
-                      Part {idx + 1}
-                    </span>
-                    <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-300 animate-pulse' : 'bg-gray-500'}`} />
-                  </div>
-                  <div className="tracking-tight text-xs whitespace-nowrap">{p.name}</div>
-                  <div className={`text-[10px] truncate max-w-[130px] font-normal ${isSelected ? 'text-indigo-100' : 'text-gray-400'}`}>
-                    {p.role}
-                  </div>
-                </button>
-              </React.Fragment>
-            )
-          })}
+        {/* Visual interconnected nodes in single view (Fully scrollable without left clipping) */}
+        <div className="w-full overflow-x-auto py-3 z-10 relative">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-max px-4 mx-auto w-fit">
+            {parts.map((p, idx) => {
+              const isSelected = p.id === activePartId
+              return (
+                <React.Fragment key={p.id}>
+                  {idx > 0 && (
+                    <div className="text-indigo-400/80 font-mono text-base select-none shrink-0 flex items-center px-0.5">
+                      <span className={isSimulatingFlow ? 'animate-pulse text-indigo-300 font-bold' : ''}>➔</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActivePartId(p.id)}
+                    className={`group px-3.5 py-2.5 rounded-2xl text-left font-bold text-xs shadow-md transition-all duration-300 shrink-0 border cursor-pointer ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white border-indigo-400 ring-2 ring-indigo-400/60 scale-105 shadow-indigo-500/40'
+                        : 'bg-gray-800/90 text-gray-200 border-gray-700/80 hover:bg-gray-750 hover:border-indigo-500/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-black uppercase tracking-wider ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-indigo-950 text-indigo-300 border border-indigo-800'
+                      }`}>
+                        Part {idx + 1}
+                      </span>
+                      <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-300 animate-pulse' : 'bg-gray-500'}`} />
+                    </div>
+                    <div className="tracking-tight text-xs whitespace-nowrap">{p.name}</div>
+                    <div className={`text-[10px] truncate max-w-[130px] font-normal ${isSelected ? 'text-indigo-100' : 'text-gray-400'}`}>
+                      {p.role}
+                    </div>
+                  </button>
+                </React.Fragment>
+              )
+            })}
+          </div>
         </div>
       </div>
 

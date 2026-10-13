@@ -1,10 +1,21 @@
 # PROGRESS
 
-Last updated: 2026-10-13 — Instant Auto-Scroll & Visible Question Processing View ✅
+Last updated: 2026-10-13 — Simulation Part 1 Full Visibility & 100% MCQ Quiz Guarantee ✅
 
 ---
 
 ## ✅ Done
+
+### Simulation Part 1 Full Visibility & 100% MCQ Quiz Guarantee (EzLearn)
+- **Part 1 Box Completely Visible (`frontend/src/components/SimulationView.jsx`)**:
+  - Resolved CSS flexbox horizontal overflow clipping in `UniversalProcessSimulation`.
+  - Replaced the `justify-center` centering container with a safe `w-fit min-w-max px-4 mx-auto` layout inside `overflow-x-auto`.
+  - The Part 1 box is now 100% fully visible from the left margin without any truncation, cutting in half, or clipped edges.
+- **Strict 100% Multiple Choice Questions Guarantee (`backend/app/api/quiz.py`, `backend/app/ai/mock.py`, `backend/main.py`, `backend/app/ai/prompts/quiz.txt`)**:
+  - Replaced question 5 from short answer format to MCQ across all mock fixtures, prompt templates, and legacy endpoints.
+  - Added strict validation in `generate_quiz` disallowing any `type: "short"` questions.
+  - Implemented guaranteed server-side post-processing: every single question in the returned quiz is strictly normalized to `type: "mcq"` with 4 distinct selectable options and matching correct answer.
+
 
 ### Instant Auto-Scroll & Visible Question Processing View (EzLearn)
 - **Automatic Instant Scroll on Submit (`frontend/src/App.jsx`)**:

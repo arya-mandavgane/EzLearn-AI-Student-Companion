@@ -47,10 +47,10 @@ MOCK_QUIZ = json.dumps([
     },
     {
         "id": 5,
-        "type": "short",
-        "question": "What does LIFO stand for, and why is it used to describe a stack?",
-        "options": [],
-        "correct_answer": "LIFO stands for Last In, First Out; the most recently added item is the first one removed.",
+        "type": "mcq",
+        "question": "What does the acronym LIFO stand for in data structures?",
+        "options": ["Last In, First Out", "Last In, Fast Output", "Linear Input, First Output", "Linked Index, First Order"],
+        "correct_answer": "Last In, First Out",
         "explanation": "LIFO means the last element pushed onto the stack is the first element popped off.",
         "topic": "LIFO Concept"
     }

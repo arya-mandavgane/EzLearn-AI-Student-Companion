@@ -1,10 +1,24 @@
 # PROGRESS
 
-Last updated: 2026-10-13 — Simulation Part 1 Full Visibility & 100% MCQ Quiz Guarantee ✅
+Last updated: 2026-10-13 — Document-Grounded Q&A Fixes, Full-Context RAG & PDF OCR Fallback ✅
 
 ---
 
 ## ✅ Done
+
+### Document-Grounded Q&A, Multi-Page RAG & PDF OCR Fallback (EzLearn)
+- **Comprehensive Multi-Page Context (`backend/app/api/chat.py`)**:
+  - Expanded the context window from 7,000 characters to up to 35,000 characters and prioritized top semantic RAG excerpts across all pages of the uploaded document.
+  - Questions about topics appearing on later pages (Page 3+) are now fully visible to the verification auditor and explanation synthesizer.
+- **Support for Document-Level & Meta-Queries (`backend/app/api/chat.py`)**:
+  - Added detection for document-level queries (*"summarize"*, *"overview"*, *"key points"*, *"what is this document about"*, etc.).
+  - Ensured document summaries and general conceptual queries with paraphrased vocabulary are never falsely rejected by exact lexical keyword checks.
+- **RAG Vector Store Auto-Rehydration (`backend/app/api/chat.py`)**:
+  - Automatically re-indexes chunks from database resources if the in-memory vector store is empty following a server reboot or deployment on Render.
+- **Scanned / Image-Based PDF OCR Fallback (`backend/app/api/chat.py`)**:
+  - Added Vision OCR extraction when a PDF contains no digital text stream, converting pages to image pixmaps and transcribing text through Gemini vision.
+- **Parallel Simulation & Quiz Generation (`backend/app/api/chat.py`)**:
+  - Concurrently executes the concept simulation and 5-question MCQ quiz via `ThreadPoolExecutor(max_workers=2)` for fast ~7s turnaround.
 
 ### Simulation Part 1 Full Visibility & 100% MCQ Quiz Guarantee (EzLearn)
 - **Part 1 Box Completely Visible (`frontend/src/components/SimulationView.jsx`)**:

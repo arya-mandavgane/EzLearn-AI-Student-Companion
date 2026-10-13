@@ -281,6 +281,22 @@ async def add_file_or_media_resource(
                 if txt:
                     pages_txt.append(f"[Page {p_idx+1}]\n{txt}")
             extracted_text = "\n\n".join(pages_txt)
+
+            # If PDF is scanned / image-based with no selectable text, perform OCR on initial pages
+            if not extracted_text:
+                ocr_pages = []
+                for p_idx in range(min(len(doc), 6)):
+                    pix = doc[p_idx].get_pixmap(dpi=150)
+                    img_bytes = pix.tobytes("png")
+                    p_text = generate_from_image(
+                        img_bytes,
+                        "image/png",
+                        f"Extract all study notes, definitions, formulas, and text from page {p_idx+1}."
+                    )
+                    if p_text and not p_text.startswith("ERROR:"):
+                        ocr_pages.append(f"[Page {p_idx+1}]\n{p_text}")
+                if ocr_pages:
+                    extracted_text = "\n\n".join(ocr_pages)
         except Exception as exc:
             logger.warning("PDF extraction failed: %s", exc)
             extracted_text = ""
@@ -366,20 +382,48 @@ def send_chat_message(
 
     # 2. RAG retrieval strictly over THIS conversation's indexed chunks (never leak other chats)
     this_conv_prefix = f"{conv_id}-"
+    # Auto-rehydrate in-memory vector store if empty (e.g. after server reboot or redeploy)
+    existing_in_store = [c for c in global_vector_store._chunks.values() if (c.get("input_id") and c["input_id"].startswith(this_conv_prefix))]
+    if not existing_in_store and conv.resources:
+        for r in conv.resources:
+            r_chunks = chunk_plain_text(f"{conv_id}-{r.id}", r.content)
+            r_embs = embed([c.content for c in r_chunks])
+            global_vector_store.add_chunks(r_chunks, embeddings=r_embs)
+
     q_vec = embed([prompt])[0] if embed([prompt]) else None
-    search_res = global_vector_store.search(query=prompt, query_embedding=q_vec, top_k=12)
+    search_res = global_vector_store.search(query=prompt, query_embedding=q_vec, top_k=15)
     conv_chunks = [
         (c, score) for c, score in search_res
         if (c.chunk_id.startswith(this_conv_prefix) or (c.input_id and c.input_id.startswith(this_conv_prefix)))
     ]
-    relevant_chunks = [c for c, score in conv_chunks if score >= 0.28]
+    relevant_chunks = [c for c, score in conv_chunks if score >= 0.20]
+    if not relevant_chunks and conv_chunks:
+        relevant_chunks = [c for c, score in conv_chunks[:4]]
 
     citations = [
         {"page": c.page, "snippet": c.snippet, "chunk_id": c.chunk_id} for c in relevant_chunks
     ]
 
-    # ── STEP 1: DETERMINISTIC LEXICAL & SEMANTIC OVERLAP CHECK ─────────────────
+    # Assemble comprehensive multi-page context: top semantic excerpts across all pages + document text
+    rag_excerpts = "\n\n".join(f"[EXCERPT - Page {c.page} ({c.heading})]:\n{c.content}" for c in relevant_chunks[:8])
+    if rag_excerpts:
+        document_context = f"=== KEY RELEVANT EXCERPTS FROM UPLOADED NOTES ===\n{rag_excerpts}\n\n=== COMPLETE STUDY MATERIAL ===\n{combined_notes[:35000]}"
+    else:
+        document_context = combined_notes[:35000]
+
+    # ── STEP 1: DETECT DOCUMENT-LEVEL & META-QUERIES ─────────────────────────
     import re
+    # Meta / overview terms indicating the student is asking about the document itself
+    doc_meta_terms = {
+        "document", "doc", "pdf", "file", "notes", "material", "materials", "uploaded",
+        "upload", "chapter", "section", "overview", "summarize", "summary", "everything",
+        "all", "main", "key", "point", "points", "takeaway", "takeaways", "topic",
+        "topics", "syllabus", "content", "contents", "intro", "introduction", "cover",
+        "covers", "covered", "teach", "taught", "about", "discuss", "explain"
+    }
+    prompt_words = set(re.findall(r"\b[a-zA-Z]{3,}\b", prompt.lower()))
+    is_meta_document_query = bool(prompt_words.intersection(doc_meta_terms))
+
     _stopwords = {
         "what", "when", "where", "which", "who", "whom", "whose", "why", "how",
         "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
@@ -390,46 +434,82 @@ def send_chat_message(
         "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again",
         "further", "then", "once", "here", "there", "all", "any", "both", "each",
         "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only",
-        "own", "same", "so", "than", "too", "very", "explain", "tell", "describe",
-        "give", "write", "define", "summary", "notes", "question", "answer", "please",
-        "show", "state", "find", "calculate", "list", "name", "help", "solve", "detail",
-        "provide", "information", "info", "discuss", "view", "know", "check", "need",
-        "simple", "terms", "words", "understand", "short", "long", "easy", "basic",
-        "main", "first", "second", "best", "different", "used", "use", "using", "make",
-        "like", "good", "right", "way", "point", "well", "also", "mean", "meaning",
-        # Generic academic terms that appear in all disciplines
-        "formula", "theorem", "theory", "law", "rule", "definition", "concept",
-        "principle", "problem", "solution", "example", "method", "system", "type",
-        "types", "process", "approach", "model", "step", "steps", "meaning", "name",
+        "own", "same", "so", "than", "too", "very", "please", "help"
     }
-
-    q_tokens = {w for w in re.findall(r"\b[a-zA-Z]{3,}\b", prompt.lower()) if w not in _stopwords}
+    q_tokens = {w for w in prompt_words if w not in _stopwords}
     notes_tokens = {w for w in re.findall(r"\b[a-zA-Z]{3,}\b", combined_notes.lower()) if w not in _stopwords}
     shared_tokens = q_tokens.intersection(notes_tokens)
 
-    # ── STEP 2: VERIFY TOPIC IS ACTUALLY IN NOTES VIA STRICT AI ────────────────
-    context_scan_prompt = f"""You are a strict academic verification auditor.
+    # FAST OUTLIER GUARD: Only reject immediately if it has zero shared keywords, is NOT a document query,
+    # and semantic search found zero matching chunks
+    if len(q_tokens) > 0 and len(shared_tokens) == 0 and not is_meta_document_query and len(relevant_chunks) == 0:
+        notes_domain = conv.title if (conv.title and conv.title != "New Study Session") else "Uploaded study notes"
+        notice = (
+            f"I cannot answer this question because it is outside the scope of your uploaded notes. "
+            f"Your uploaded notes are about '{notes_domain}', while your question is about '{prompt[:60]}'. "
+            "EzLearn answers questions strictly based on your uploaded study materials. "
+            "Please ask a question related to your uploaded notes or attach resources covering this topic."
+        )
+        explanation_data = {
+            "topic": prompt,
+            "is_outlier": True,
+            "outlier_notice": notice,
+            "file_context": notes_domain,
+            "body": None,
+            "summary": None,
+            "real_life_picture": None,
+            "key_terms": [],
+        }
+        msg_id = str(uuid.uuid4())
+        msg = MessageRecord(
+            id=msg_id,
+            conversation_id=conv_id,
+            role="assistant",
+            user_prompt=prompt,
+            explanation_json=json.dumps(explanation_data),
+            simulation_json=None,
+            quiz_json=None,
+            citations_json=json.dumps([]),
+            ai_suggestions=None,
+        )
+        db.add(msg)
+        conv.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        return {
+            "message_id": msg_id,
+            "user_prompt": prompt,
+            "explanation": explanation_data,
+            "simulation": None,
+            "quiz": None,
+            "citations": [],
+            "is_outlier": True,
+        }
+
+    # ── STEP 2: GROUNDED VERIFICATION AUDITOR ────────────────────────────────
+    context_scan_prompt = f"""You are an academic verification auditor for EzLearn.
 A student uploaded study notes on a specific topic and asked a question.
-Your job is to determine whether the student's question is about a concept that is ACTUALLY PRESENT OR TAUGHT in the uploaded notes.
+Your job is to determine whether the student's question is asking about the uploaded notes or is completely unrelated.
 
 STUDENT QUESTION:
 {prompt}
 
 STUDENT'S UPLOADED STUDY NOTES:
-{combined_notes[:7000]}
+{document_context[:14000]}
 
-STRICT RULES:
-1. "notes_subject": State the exact academic subject of the uploaded notes (e.g. "Computer Science - Data Structures", "Operating Systems", etc.).
-2. "question_subject": State the exact academic subject of the student question (e.g. "Geometry - Pythagoras Theorem", "World Geography", "Biology", etc.).
-3. "is_covered_in_notes": Answer true ONLY if the topic of the question ('{prompt}') is directly discussed, defined, or taught in the uploaded notes above.
-4. If the notes are about Computer Science and the question is about Geometry/Math (like Pythagoras theorem), Geography, Literature, etc., "is_covered_in_notes" MUST BE FALSE.
-5. If the question cannot be answered using the concepts in the uploaded notes, "is_covered_in_notes" MUST BE FALSE.
+RULES:
+1. "notes_subject": State the academic subject of the uploaded notes (e.g. "Computer Science - Operating Systems", "Biology - Botany", etc.).
+2. "question_subject": State the academic subject of the student question.
+3. "is_covered_in_notes": Answer TRUE if:
+   - The question asks for an overview, summary, key takeaways, or explanation of the uploaded document or its contents.
+   - The question asks about any concept, term, method, formula, or example discussed or referenced in the notes above.
+   Answer FALSE ONLY if the question is about a completely unrelated foreign domain (e.g., student uploaded Operating Systems notes but asked about Pythagoras Theorem, French History, or Cooking Recipes).
 
 Respond ONLY with valid JSON:
 {{
   "notes_subject": "Academic subject of the notes",
   "question_subject": "Academic subject of the question",
-  "is_covered_in_notes": false,
+  "is_covered_in_notes": true,
   "reason": "Why this is or is not covered in the notes"
 }}
 """
@@ -447,7 +527,7 @@ Respond ONLY with valid JSON:
         return default
 
     fits_context = False
-    notes_domain = "Uploaded study notes"
+    notes_domain = conv.title if (conv.title and conv.title != "New Study Session") else "Uploaded study notes"
     q_domain = "Asked topic"
 
     try:
@@ -457,20 +537,14 @@ Respond ONLY with valid JSON:
             notes_domain = scan_data.get("notes_subject") or notes_domain
             q_domain = scan_data.get("question_subject") or q_domain
             is_covered = _parse_bool(scan_data.get("is_covered_in_notes"), default=False)
-
-            if is_covered:
+            if is_covered or is_meta_document_query:
                 fits_context = True
     except Exception as e:
         logger.warning("Error parsing scan json: %s", e)
-        fits_context = False
-
-    # HARD ENFORCEMENT: If the question shares ZERO meaningful topic keywords with the notes, it CANNOT be answered from the notes!
-    if len(q_tokens) > 0 and len(shared_tokens) == 0:
-        fits_context = False
+        # If user asked about the document or has retrieved chunks, allow it
+        fits_context = is_meta_document_query or len(relevant_chunks) > 0
 
     # ── CASE A: QUESTION DOES NOT FIT IN FILE CONTEXT ─────────────────────────
-    # Questions that do not fit in the context of the file MUST NOT be answered.
-    # Refuse strictly: no explanation body, no simulation, no quiz.
     if not fits_context:
         notice = (
             f"I cannot answer this question because it is outside the scope of your uploaded notes. "
@@ -490,7 +564,6 @@ Respond ONLY with valid JSON:
             "key_terms": [],
         }
 
-        # Save record with NO simulation and NO quiz
         msg_id = str(uuid.uuid4())
         msg = MessageRecord(
             id=msg_id,
@@ -518,47 +591,43 @@ Respond ONLY with valid JSON:
         }
 
     # ── CASE B: QUESTION FITS FILE CONTEXT ─────────────────────────────────────
-    # Synthesize across attached resources in this conversation.
-    # Answers must be based purely on the attached study materials without external web knowledge.
     domain = notes_domain
 
-    # 3. Step 2: Generate Explanation strictly grounded in the attached materials
     exp_prompt = f"""You are AI Study Companion. A student uploaded study notes on {domain} and asked a question.
 
 STUDENT QUESTION:
 {prompt}
 
-STUDENT'S UPLOADED STUDY NOTES (Your ONLY allowed source of information):
-{combined_notes[:7000]}
+STUDENT'S UPLOADED STUDY NOTES (Your source of information):
+{document_context}
 
 STRICT GROUNDING DIRECTIVE:
-You are an extractive and synthesized grounding engine. You are STRICTLY FORBIDDEN from using any pre-trained external knowledge.
-1. Scan the STUDENT'S UPLOADED STUDY NOTES above.
-2. Does the uploaded text explicitly define, explain, or answer the student's question ('{prompt}')?
-   - If NO (the concept or question is outside the uploaded notes, such as asking about geometry/theorems/formulas/topics not mentioned in the text):
-     You MUST return EXACTLY this JSON:
-     {{
-       "topic": "{prompt}",
-       "is_outlier": true,
-       "body": null,
-       "summary": null,
-       "real_life_picture": null,
-       "key_terms": []
-     }}
-   - If YES (the concept is explicitly covered in the text):
-     Return the explanation strictly synthesized from the text:
-     {{
-       "topic": "Specific Topic from Notes",
-       "is_outlier": false,
-       "topic_type": "analogy",
-       "real_life_picture": "Analogy based on notes",
-       "summary": "Summary based strictly on notes",
-       "body": "Detailed explanation based strictly on the uploaded study notes",
-       "key_terms": [{{"term": "Term", "meaning": "Meaning"}}]
-     }}
+You are an extractive and synthesized grounding engine. You must answer strictly based on the uploaded notes above.
+1. If the student asks for an overview or summary of the uploaded document, synthesize the core concepts, objectives, and key takeaways taught in the document.
+2. If the student asks about a specific concept, explain it clearly using the principles and definitions in the notes, accompanied by an everyday real-world analogy.
+3. If the question is about a topic completely unrelated to the uploaded notes:
+   Return:
+   {{
+     "topic": "{prompt}",
+     "is_outlier": true,
+     "body": null,
+     "summary": null,
+     "real_life_picture": null,
+     "key_terms": []
+   }}
+4. Otherwise return valid JSON:
+   {{
+     "topic": "Specific Topic Name from Notes",
+     "is_outlier": false,
+     "topic_type": "concept",
+     "real_life_picture": "Intuitive real world analogy illustrating the concept based on the notes",
+     "summary": "Clear executive summary synthesized from the notes",
+     "body": "Detailed explanation based strictly on the uploaded study notes",
+     "key_terms": [{{"term": "Key Term", "meaning": "Definition from notes"}}]
+   }}
 
-Respond ONLY with valid JSON.
-"""
+Respond ONLY with valid JSON."""
+
     raw_exp = generate(exp_prompt)
     try:
         from app.api.explain import _parse_ai_json
@@ -568,7 +637,6 @@ Respond ONLY with valid JSON.
     except Exception:
         explanation_data = {}
 
-    # If the model itself reported this topic as an outlier or missing from the notes, reject strictly!
     if explanation_data.get("is_outlier") is True or not explanation_data.get("body"):
         notice = (
             f"I cannot answer this question because it is outside the scope of your uploaded notes. "
@@ -635,10 +703,10 @@ Respond ONLY with valid JSON.
     if "key_terms" not in explanation_data:
         explanation_data["key_terms"] = []
 
-    # 4. Step 3: Demonstration / Simulation Plan (Single unified view showing all parts)
+    # ── CONCURRENT EXECUTION: SIMULATION (STEP 3) + 5-QUESTION QUIZ (STEP 4) ───
     topic_name = explanation_data.get("topic") or prompt
     summary_text = explanation_data.get("summary") or ""
-    analogy_text = explanation_data.get("analogy") or ""
+    analogy_text = explanation_data.get("analogy") or explanation_data.get("real_life_picture") or ""
 
     sim_prompt = f"""You are an expert educational visualizer.
 The student asked: "{prompt}"
@@ -669,16 +737,21 @@ Return a valid JSON object strictly matching this schema:
 }}
 Return ONLY valid JSON (no markdown, no extra commentary)."""
 
-    raw_sim = generate(sim_prompt)
-    simulation_data = None
-    try:
-        from app.api.explain import _parse_ai_json
-        simulation_data = _parse_ai_json(raw_sim, expected_type=dict)
-        # Ensure template is 'process' so it never falls into stack/queue plates or lines
-        if isinstance(simulation_data, dict):
-            simulation_data["template"] = "process"
-    except Exception:
-        simulation_data = {
+    quiz_topic = explanation_data.get("topic") or prompt
+    chunk_context = "\n\n".join(f"[EXCERPT - Page {c.page}]:\n{c.snippet or c.content}" for c in relevant_chunks[:6]) if relevant_chunks else ""
+    quiz_context = f"{chunk_context}\n\n---\n\n{combined_notes[:4000]}" if chunk_context else combined_notes[:4000]
+
+    def _generate_sim_task():
+        try:
+            raw_sim = generate(sim_prompt)
+            from app.api.explain import _parse_ai_json
+            s_data = _parse_ai_json(raw_sim, expected_type=dict)
+            if isinstance(s_data, dict):
+                s_data["template"] = "process"
+                return s_data
+        except Exception as e:
+            logger.warning("Simulation generation error: %s", e)
+        return {
             "template": "process",
             "title": f"{topic_name} Process Demonstration",
             "intro": f"Interactive structural demonstration of {topic_name} showing how its key components operate in sequence.",
@@ -690,17 +763,20 @@ Return ONLY valid JSON (no markdown, no extra commentary)."""
             "analogy": analogy_text or f"A structured workflow coordinating all elements of {topic_name}.",
         }
 
-    # 5. Step 4: Generate 5-Question Quiz focused specifically on the student's asked topic/query
-    quiz_topic = explanation_data.get("topic") or prompt
-    # Prioritize topic-relevant retrieved chunks, combined with notes context
-    chunk_context = "\n\n".join(f"[EXCERPT - Page {c.page}]:\n{c.snippet or c.content}" for c in relevant_chunks[:6]) if relevant_chunks else ""
-    quiz_context = f"{chunk_context}\n\n---\n\n{combined_notes[:4000]}" if chunk_context else combined_notes[:4000]
+    def _generate_quiz_task():
+        return generate_quiz(QuizGenerateRequest(
+            text=quiz_context,
+            num_questions=5,
+            topic=quiz_topic,
+        ))
 
-    quiz_res = generate_quiz(QuizGenerateRequest(
-        text=quiz_context,
-        num_questions=5,
-        topic=quiz_topic,
-    ))
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        sim_future = executor.submit(_generate_sim_task)
+        quiz_future = executor.submit(_generate_quiz_task)
+        simulation_data = sim_future.result()
+        quiz_res = quiz_future.result()
+
     from app.api.quiz import _quizzes
     backend_quiz = _quizzes.get(quiz_res.quiz_id, {})
     quiz_payload = {

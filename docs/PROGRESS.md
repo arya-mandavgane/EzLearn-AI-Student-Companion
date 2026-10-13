@@ -1,10 +1,20 @@
 # PROGRESS
 
-Last updated: 2026-10-13 — Dynamic Concept Simulations & Real-Time Performance Reports Update ✅
+Last updated: 2026-10-13 — Instant Auto-Scroll & Visible Question Processing View ✅
 
 ---
 
 ## ✅ Done
+
+### Instant Auto-Scroll & Visible Question Processing View (EzLearn)
+- **Automatic Instant Scroll on Submit (`frontend/src/App.jsx`)**:
+  - Implemented `chatContainerRef` and direct container `scrollToBottom` helper in addition to `messagesEndRef`.
+  - Pressing Enter or clicking Send immediately scrolls the chat container to the bottom on multiple staggered intervals (0ms, 20ms, 150ms, 300ms) and via reactive `useEffect([sendingMessage, pendingQuestion])`.
+  - Users no longer have to manually scroll to see that their message is processing.
+- **Immediate User Question Display (`frontend/src/App.jsx`)**:
+  - Hid full-height empty welcome state when `sendingMessage === true`, preventing initial chats from pushing the processing card off-screen.
+  - The student's question bubble (*"What You Asked"*) renders instantly above the animated synthesis card (*"Generating Answer from Attached Resources…"*) in full view without manual scrolling.
+
 
 ### Concept-Tailored Process Simulations & Live Performance Reports (EzLearn)
 - **Concept-Tailored Demonstrations (`backend/app/api/chat.py`, `frontend/src/components/SimulationView.jsx`)**:

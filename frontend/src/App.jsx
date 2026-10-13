@@ -98,9 +98,32 @@ export default function App() {
   const [backendStatus, setBackendStatus] = useState('checking') // 'checking' | 'online' | 'offline' | 'waking'
   const [isWakingUp, setIsWakingUp] = useState(false)
   const [backendInfo, setBackendInfo] = useState(null)
-
   const messagesEndRef = useRef(null)
+  const chatContainerRef = useRef(null)
   const recognitionRef = useRef(null)
+
+  function scrollToBottom(smooth = true) {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      })
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' })
+  }
+
+  // Auto-scroll whenever user asks a question or a response arrives
+  useEffect(() => {
+    if (sendingMessage || pendingQuestion) {
+      scrollToBottom(true)
+    }
+  }, [sendingMessage, pendingQuestion])
+
+  useEffect(() => {
+    if (currentConvData?.messages?.length) {
+      scrollToBottom(true)
+    }
+  }, [currentConvData?.messages?.length])
 
   // Apply dark mode class to root
   useEffect(() => {
@@ -356,6 +379,11 @@ export default function App() {
     setErrorNotice('')
     setPromptInput('')
 
+    // Instantly scroll down so the user's question and processing indicator are in full view immediately
+    setTimeout(() => scrollToBottom(true), 20)
+    setTimeout(() => scrollToBottom(true), 150)
+    setTimeout(() => scrollToBottom(true), 300)
+
     try {
       const res = await fetch(`${API_URL}/api/chat/conversations/${activeConvId}/messages`, {
         method: 'POST',
@@ -376,7 +404,7 @@ export default function App() {
     } finally {
       setSendingMessage(false)
       setPendingQuestion('')
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 200)
+      setTimeout(() => scrollToBottom(true), 150)
     }
   }
 
@@ -717,10 +745,10 @@ export default function App() {
         )}
 
         {/* Scrollable Message Transcript */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-8">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-8">
           
           {/* Welcome / Empty chat state */}
-          {(!currentConvData?.messages || currentConvData.messages.length === 0) && (
+          {(!currentConvData?.messages || currentConvData.messages.length === 0) && !sendingMessage && (
             <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-4">
               <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 border border-indigo-400/30 flex items-center justify-center text-white shadow-xl shadow-indigo-500/20 select-none">
                 <span
@@ -916,7 +944,7 @@ export default function App() {
             </div>
           )}
 
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-6" />
         </div>
 
         {/* Error Notice */}
